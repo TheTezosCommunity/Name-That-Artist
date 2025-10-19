@@ -60,13 +60,20 @@ async function writeJSON(filePath, data) {
 /**
  * Save tokens to file
  * @param {Array} tokens - Array of token objects
+ * @param {Object} artistInfo - Optional artist info map (address -> info)
  */
-export async function saveTokens(tokens) {
-    await writeJSON(TOKENS_FILE, {
+export async function saveTokens(tokens, artistInfo = null) {
+    const data = {
         lastUpdated: new Date().toISOString(),
         count: tokens.length,
         tokens: tokens
-    });
+    };
+    
+    if (artistInfo) {
+        data.artistInfo = artistInfo;
+    }
+    
+    await writeJSON(TOKENS_FILE, data);
 }
 
 /**

@@ -6,7 +6,7 @@
 
 import { config } from './config.js';
 import { loadTokens, needsTokenRefresh } from './services/storage.js';
-import { fetchAllTokens, normalizeToken, getUniqueArtists, getDistractors } from './services/objkt-api.js';
+import { fetchAllTokens, normalizeToken, getUniqueArtists, getDistractors, batchResolveArtistNames } from './services/objkt-api.js';
 
 /**
  * Game class to manage Name That Artist game sessions
@@ -16,6 +16,7 @@ export class NameThatArtistGame {
         this.activeSessions = new Map();
         this.tokens = [];
         this.artists = [];
+        this.artistInfo = {}; // Map of address -> artist info (alias, tzdomain, etc.)
         this.isInitialized = false;
     }
 
@@ -36,17 +37,48 @@ export class NameThatArtistGame {
                 const rawTokens = await fetchAllTokens();
                 this.tokens = rawTokens.map(normalizeToken).filter(t => t.imageUrl);
                 
-                // Save to cache
+                // Extract unique artists
+                const allArtists = getUniqueArtists(this.tokens);
+                
+                // Resolve artist names (alias/tzdomain)
+                console.log('🔍 Resolving artist information...');
+                this.artistInfo = await batchResolveArtistNames(allArtists);
+                
+                // Save to cache with artist info
                 const { saveTokens } = await import('./services/storage.js');
-                await saveTokens(this.tokens);
+                await saveTokens(this.tokens, this.artistInfo);
             } else {
                 console.log('📂 Loading tokens from cache...');
                 const data = await loadTokens();
                 this.tokens = data.tokens;
+                this.artistInfo = data.artistInfo || {};
+                
+                // If no artist info in cache, resolve it now
+                if (Object.keys(this.artistInfo).length === 0) {
+                    const allArtists = getUniqueArtists(this.tokens);
+                    console.log('🔍 Resolving artist information (not in cache)...');
+                    this.artistInfo = await batchResolveArtistNames(allArtists);
+                    
+                    // Update cache with artist info
+                    const { saveTokens } = await import('./services/storage.js');
+                    await saveTokens(this.tokens, this.artistInfo);
+                }
             }
 
-            // Extract unique artists
-            this.artists = getUniqueArtists(this.tokens);
+            // Filter artists based on config
+            const allArtists = getUniqueArtists(this.tokens);
+            if (config.game.excludeUnresolvedArtists) {
+                this.artists = allArtists.filter(address => this.artistInfo[address]?.hasResolution);
+                console.log(`   Filtered to ${this.artists.length} artists with alias/domain`);
+                
+                // Filter tokens to only include those with resolved artists
+                this.tokens = this.tokens.filter(token => 
+                    this.artistInfo[token.primaryArtist]?.hasResolution
+                );
+                console.log(`   Filtered to ${this.tokens.length} tokens with resolved artists`);
+            } else {
+                this.artists = allArtists;
+            }
             
             console.log(`✅ Game initialized with ${this.tokens.length} tokens and ${this.artists.length} unique artists`);
             this.isInitialized = true;
@@ -363,6 +395,20 @@ export class NameThatArtistGame {
 
         const elapsed = (Date.now() - currentRound.startTime) / 1000;
         return elapsed >= config.game.roundTimeSeconds;
+    }
+
+    /**
+     * Get display name for an artist (with failover)
+     * Priority: alias -> tzdomain -> shortened wallet address
+     * @param {string} address - Tezos wallet address
+     * @returns {string} Display name
+     */
+    getArtistDisplayName(address) {
+        const info = this.artistInfo[address];
+        if (info?.displayName) {
+            return info.displayName;
+        }
+        return this.formatArtistAddress(address);
     }
 
     /**

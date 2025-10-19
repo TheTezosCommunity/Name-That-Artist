@@ -35,6 +35,7 @@ export const config = {
         minPlayers: 1,              // Minimum players to start
         maxPlayers: 20,             // Maximum players per game
         tokenRefreshHours: 24,      // Hours before refreshing token cache
+        excludeUnresolvedArtists: true, // Exclude artists without alias or tzdomain
     },
     
     // Branding

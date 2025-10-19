@@ -292,7 +292,7 @@ async function displayRound(channel, channelId) {
     round.choices.forEach(choice => {
         const button = new ButtonBuilder()
             .setCustomId(`answer_${channelId}_${choice.label}`)
-            .setLabel(`${choice.label} ${gameManager.formatArtistAddress(choice.artist)}`)
+            .setLabel(`${choice.label} ${gameManager.getArtistDisplayName(choice.artist)}`)
             .setStyle(ButtonStyle.Primary);
         row.addComponents(button);
     });
@@ -326,7 +326,7 @@ async function endRound(channel, channelId, message) {
         currentRound.choices.forEach(choice => {
             const button = new ButtonBuilder()
                 .setCustomId(`answer_${channelId}_${choice.label}`)
-                .setLabel(`${choice.label} ${gameManager.formatArtistAddress(choice.artist)}`)
+                .setLabel(`${choice.label} ${gameManager.getArtistDisplayName(choice.artist)}`)
                 .setStyle(choice.isCorrect ? ButtonStyle.Success : ButtonStyle.Secondary)
                 .setDisabled(true);
             disabledRow.addComponents(button);
@@ -342,7 +342,7 @@ async function endRound(channel, channelId, message) {
     const resultEmbed = new EmbedBuilder()
         .setColor(config.branding.color)
         .setTitle('⏰ Time\'s Up!')
-        .setDescription(`The correct answer was: **${correctChoice.label} ${gameManager.formatArtistAddress(correctChoice.artist)}**`)
+        .setDescription(`The correct answer was: **${correctChoice.label} ${gameManager.getArtistDisplayName(correctChoice.artist)}**`)
         .setFooter({ text: 'Get ready for the next round!' });
 
     await channel.send({ embeds: [resultEmbed] });

@@ -36,6 +36,20 @@ const TOKENS_QUERY = gql`
 `;
 
 /**
+ * GraphQL query to fetch artist info (alias, tzdomain, etc.)
+ */
+const ARTIST_INFO_QUERY = gql`
+  query GetArtistInfo($address: String!) {
+    holder(where: {address: {_eq: $address}}) {
+      tzdomain
+      alias
+      description
+      logo
+    }
+  }
+`;
+
+/**
  * Fetch tokens from the TTC wallet with pagination
  * @param {number} limit - Number of tokens per page
  * @param {number} offset - Offset for pagination
@@ -137,6 +151,94 @@ export function getUniqueArtists(tokens) {
     });
     
     return Array.from(artistSet);
+}
+
+/**
+ * Fetch artist info (alias, tzdomain) for a wallet address
+ * @param {string} address - Tezos wallet address
+ * @returns {Promise<Object|null>} Artist info or null
+ */
+export async function fetchArtistInfo(address) {
+    try {
+        const data = await client.request(ARTIST_INFO_QUERY, { address });
+        
+        if (!data.holder || !data.holder[0]) {
+            return null;
+        }
+        
+        return data.holder[0];
+    } catch (error) {
+        console.error(`Error fetching artist info for ${address}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Resolve artist display name with failover
+ * Priority: alias -> tzdomain -> wallet address
+ * @param {string} address - Tezos wallet address
+ * @param {Object} artistInfoCache - Cache of artist info to avoid repeated API calls
+ * @returns {Promise<Object>} Object with displayName and hasResolution
+ */
+export async function resolveArtistName(address, artistInfoCache = {}) {
+    // Check cache first
+    if (artistInfoCache[address]) {
+        const info = artistInfoCache[address];
+        const displayName = info.alias || info.tzdomain || address;
+        const hasResolution = !!(info.alias || info.tzdomain);
+        return { displayName, hasResolution, info };
+    }
+    
+    // Fetch artist info
+    const info = await fetchArtistInfo(address);
+    
+    if (!info) {
+        return { 
+            displayName: address, 
+            hasResolution: false,
+            info: null
+        };
+    }
+    
+    // Store in cache
+    artistInfoCache[address] = info;
+    
+    // Priority: alias -> tzdomain -> wallet address
+    const displayName = info.alias || info.tzdomain || address;
+    const hasResolution = !!(info.alias || info.tzdomain);
+    
+    return { displayName, hasResolution, info };
+}
+
+/**
+ * Batch resolve artist names for multiple addresses
+ * @param {Array<string>} addresses - Array of Tezos wallet addresses
+ * @returns {Promise<Object>} Map of address to resolved name info
+ */
+export async function batchResolveArtistNames(addresses) {
+    const artistInfoMap = {};
+    
+    console.log(`🔍 Resolving artist names for ${addresses.length} unique artists...`);
+    
+    // Process in batches to avoid overwhelming the API
+    const batchSize = 10;
+    for (let i = 0; i < addresses.length; i += batchSize) {
+        const batch = addresses.slice(i, i + batchSize);
+        
+        await Promise.all(
+            batch.map(async (address) => {
+                const result = await resolveArtistName(address, artistInfoMap);
+                artistInfoMap[address] = result;
+            })
+        );
+        
+        console.log(`   Resolved ${Math.min(i + batchSize, addresses.length)}/${addresses.length} artists...`);
+    }
+    
+    const resolvedCount = Object.values(artistInfoMap).filter(a => a.hasResolution).length;
+    console.log(`✅ Artist resolution complete: ${resolvedCount}/${addresses.length} resolved to alias/domain`);
+    
+    return artistInfoMap;
 }
 
 /**
