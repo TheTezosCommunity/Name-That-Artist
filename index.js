@@ -1,12 +1,9 @@
-import { Client, GatewayIntentBits, Events, REST, Routes } from 'discord.js';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
+import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { config, validateConfig } from './config.js';
+import { gameManager } from './game.js';
 
 // Validate required environment variables
-if (!process.env.DISCORD_TOKEN) {
-    console.error('ERROR: DISCORD_TOKEN is not set in .env file');
+if (!validateConfig()) {
     process.exit(1);
 }
 
@@ -37,6 +34,44 @@ client.on(Events.Error, (error) => {
     console.error('❌ Discord client error:', error);
 });
 
+// Handle message for game guesses
+client.on(Events.MessageCreate, async (message) => {
+    // Ignore bot messages
+    if (message.author.bot) return;
+    
+    // Check if there's an active game in this channel
+    const session = gameManager.getSession(message.channelId);
+    if (!session || session.solved) return;
+    
+    // Check the guess
+    const result = gameManager.checkGuess(message.channelId, message.content);
+    
+    if (result.correct) {
+        await message.reply({
+            content: result.message,
+            allowedMentions: { repliedUser: true }
+        });
+        // Clean up the game session after a short delay
+        setTimeout(() => {
+            gameManager.endGame(message.channelId);
+        }, 5000);
+    } else if (result.gameOver) {
+        await message.reply({
+            content: result.message,
+            allowedMentions: { repliedUser: true }
+        });
+        // Clean up the game session
+        setTimeout(() => {
+            gameManager.endGame(message.channelId);
+        }, 5000);
+    } else if (result.success) {
+        await message.reply({
+            content: result.message,
+            allowedMentions: { repliedUser: true }
+        });
+    }
+});
+
 // Handle interactions (slash commands)
 client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
@@ -53,8 +88,87 @@ client.on(Events.InteractionCreate, async (interaction) => {
     
     // Name That Artist game command
     if (commandName === 'namethatartist') {
+        const result = gameManager.startGame(interaction.channelId, interaction.user.id);
+        
+        if (!result.success) {
+            await interaction.reply({
+                content: `⚠️ ${result.message}`,
+                ephemeral: true
+            });
+            return;
+        }
+
+        const gameEmbed = {
+            color: config.branding.color,
+            title: '🎨 Name That Artist - TTC Edition',
+            description: 'Can you guess the artist behind this artwork?\n\n_Note: This is a demo. Add real Tezos artist data to `game.js` for a full experience._',
+            fields: [
+                {
+                    name: '📋 How to Play',
+                    value: 'Type your guess in the chat!\nYou have **3 attempts** to guess correctly.',
+                },
+                {
+                    name: '💡 Need Help?',
+                    value: 'Use `/hint` to get a clue (coming soon)',
+                },
+            ],
+            image: {
+                url: result.artwork || 'https://via.placeholder.com/400x400?text=Artwork+Placeholder',
+            },
+            footer: {
+                text: `${config.branding.name} • Started by ${interaction.user.username}`,
+            },
+            timestamp: new Date().toISOString(),
+        };
+
+        await interaction.reply({ embeds: [gameEmbed] });
+    }
+    
+    // Hint command
+    if (commandName === 'hint') {
+        const result = gameManager.getHint(interaction.channelId);
+        
+        if (!result.success) {
+            await interaction.reply({
+                content: `⚠️ ${result.message}`,
+                ephemeral: true
+            });
+            return;
+        }
+
         await interaction.reply({
-            content: '🎨 **Name That Artist - TTC Edition**\n\nWelcome to The Tezos Community\'s art guessing game!\n\n_Game features coming soon..._',
+            content: result.message,
+            ephemeral: false
+        });
+    }
+    
+    // Stop game command
+    if (commandName === 'stopgame') {
+        const session = gameManager.getSession(interaction.channelId);
+        
+        if (!session) {
+            await interaction.reply({
+                content: '⚠️ No active game in this channel.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Only the person who started the game or someone with manage messages permission can stop it
+        const canStop = interaction.user.id === session.startedBy || 
+                       interaction.memberPermissions?.has('ManageMessages');
+
+        if (!canStop) {
+            await interaction.reply({
+                content: '⚠️ Only the person who started the game or moderators can stop it.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        gameManager.endGame(interaction.channelId);
+        await interaction.reply({
+            content: `🛑 Game stopped. The artist was **${session.artist}**.`,
             ephemeral: false
         });
     }
@@ -62,17 +176,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // Help command
     if (commandName === 'help') {
         const helpEmbed = {
-            color: 0x0099ff,
+            color: config.branding.color,
             title: '🎨 Name That Artist - Help',
             description: 'Welcome to TTC\'s Name That Artist game!',
             fields: [
                 {
                     name: '📋 Commands',
-                    value: '`/namethatartist` - Start a new game\n`/ping` - Check bot status\n`/help` - Show this help message',
+                    value: '`/namethatartist` - Start a new game\n`/hint` - Get a hint for the current game\n`/stopgame` - Stop the current game\n`/ping` - Check bot status\n`/help` - Show this help message',
                 },
                 {
                     name: '🎮 How to Play',
-                    value: 'The game will show you artwork from Tezos artists. Your goal is to guess the artist\'s name!',
+                    value: 'The game will show you artwork from Tezos artists. Your goal is to guess the artist\'s name!\n\nSimply type your guess in the chat when a game is active. You have 3 attempts!',
                 },
                 {
                     name: '🏆 About',
@@ -81,7 +195,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             ],
             timestamp: new Date().toISOString(),
             footer: {
-                text: 'TTC - The Tezos Community',
+                text: config.branding.name,
             },
         };
 
@@ -90,7 +204,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 // Login to Discord
-client.login(process.env.DISCORD_TOKEN)
+client.login(config.token)
     .catch((error) => {
         console.error('❌ Failed to login to Discord:', error);
         process.exit(1);

@@ -21,6 +21,14 @@ const commands = [
         description: 'Start a Name That Artist game - guess the Tezos artist!',
     },
     {
+        name: 'hint',
+        description: 'Get a hint for the current game',
+    },
+    {
+        name: 'stopgame',
+        description: 'Stop the current game in this channel',
+    },
+    {
         name: 'help',
         description: 'Get help and information about the Name That Artist game',
     },
