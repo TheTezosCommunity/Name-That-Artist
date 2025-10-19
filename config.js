@@ -63,6 +63,11 @@ export const config = {
                 user: 10,      // Per-user cooldown: 10 seconds
                 channel: 0,    // No channel cooldown
             },
+            // All-time leaderboard command - similar to leaderboard
+            alltime: {
+                user: 10,      // Per-user cooldown: 10 seconds
+                channel: 0,    // No channel cooldown
+            },
             // Stats command - personal stats, light rate limiting
             stats: {
                 user: 5,       // Per-user cooldown: 5 seconds

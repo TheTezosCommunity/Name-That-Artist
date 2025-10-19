@@ -29,6 +29,48 @@ const commands = [
         description: 'View your personal game statistics',
     },
     {
+        name: 'alltime',
+        description: 'View all-time leaderboards with various sorting options',
+        options: [
+            {
+                name: 'sort',
+                description: 'How to sort the leaderboard',
+                type: 3, // STRING type
+                required: false,
+                choices: [
+                    {
+                        name: 'Total Score',
+                        value: 'totalScore'
+                    },
+                    {
+                        name: 'Total Wins',
+                        value: 'totalWins'
+                    },
+                    {
+                        name: 'Average Score',
+                        value: 'averageScore'
+                    },
+                    {
+                        name: 'Best Score',
+                        value: 'bestScore'
+                    },
+                    {
+                        name: 'Accuracy Rate',
+                        value: 'accuracyRate'
+                    },
+                    {
+                        name: 'Games Played',
+                        value: 'totalGames'
+                    },
+                    {
+                        name: 'Correct Answers',
+                        value: 'totalCorrectAnswers'
+                    }
+                ]
+            }
+        ]
+    },
+    {
         name: 'stopgame',
         description: 'Stop the current game in this channel',
     },

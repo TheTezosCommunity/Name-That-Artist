@@ -136,7 +136,7 @@ export class NameThatArtistGame {
                 correctAnswer: token.primaryArtist,
                 answered: new Set(), // Users who have answered
             })),
-            players: new Map(), // userId -> {username, score, correctAnswers}
+            players: new Map(), // userId -> {username, score, correctAnswers, incorrectAnswers}
             isActive: true,
             messageId: null, // Discord message ID for the current round
         };
@@ -226,7 +226,8 @@ export class NameThatArtistGame {
             session.players.set(userId, {
                 username,
                 score: 0,
-                correctAnswers: 0
+                correctAnswers: 0,
+                incorrectAnswers: 0
             });
         }
 
@@ -250,6 +251,8 @@ export class NameThatArtistGame {
                 message: `✅ Correct! +${score} points`
             };
         } else {
+            player.incorrectAnswers++;
+            
             return {
                 success: true,
                 correct: false,
@@ -332,7 +335,8 @@ export class NameThatArtistGame {
             userId,
             username: data.username,
             score: data.score,
-            correctAnswers: data.correctAnswers
+            correctAnswers: data.correctAnswers,
+            incorrectAnswers: data.incorrectAnswers
         }));
 
         // Sort by score (descending)
@@ -365,7 +369,14 @@ export class NameThatArtistGame {
             
             for (const player of finalScores.scores) {
                 const isWinner = finalScores.winners.some(w => w.userId === player.userId);
-                await updatePlayerStats(player.userId, player.username, player.score, isWinner);
+                await updatePlayerStats(
+                    player.userId, 
+                    player.username, 
+                    player.score, 
+                    isWinner,
+                    player.correctAnswers,
+                    player.incorrectAnswers
+                );
             }
         }
         

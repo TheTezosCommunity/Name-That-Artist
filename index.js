@@ -238,10 +238,87 @@ async function handleSlashCommand(interaction) {
                 { name: '📈 Total Score', value: stats.totalScore.toString(), inline: true },
                 { name: '⭐ Best Score', value: stats.bestScore.toString(), inline: true },
                 { name: '📊 Average Score', value: stats.averageScore.toString(), inline: true },
-                { name: '🎯 Win Rate', value: `${Math.round((stats.totalWins / stats.totalGames) * 100)}%`, inline: true }
+                { name: '🎯 Win Rate', value: `${Math.round((stats.totalWins / stats.totalGames) * 100)}%`, inline: true },
+                { name: '✅ Correct Answers', value: stats.totalCorrectAnswers.toString(), inline: true },
+                { name: '❌ Incorrect Answers', value: stats.totalIncorrectAnswers.toString(), inline: true },
+                { name: '🎯 Accuracy', value: `${stats.accuracyRate}%`, inline: true }
             )
             .setFooter({ text: config.branding.name })
             .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        return;
+    }
+
+    // All-time leaderboard command
+    if (commandName === 'alltime') {
+        await interaction.deferReply();
+        
+        const sortBy = interaction.options.getString('sort') || 'totalScore';
+        const leaderboard = await getLeaderboard(sortBy, 10);
+        
+        if (leaderboard.length === 0) {
+            await interaction.editReply({
+                content: '📊 No games played yet! Start a game with `/namethatartist`'
+            });
+            return;
+        }
+
+        // Map sort fields to display names
+        const sortNames = {
+            totalScore: 'Total Score',
+            totalWins: 'Total Wins',
+            averageScore: 'Average Score',
+            bestScore: 'Best Score',
+            accuracyRate: 'Accuracy Rate',
+            totalGames: 'Games Played',
+            totalCorrectAnswers: 'Correct Answers'
+        };
+
+        // Map sort fields to emojis
+        const sortEmojis = {
+            totalScore: '📈',
+            totalWins: '🏆',
+            averageScore: '📊',
+            bestScore: '⭐',
+            accuracyRate: '🎯',
+            totalGames: '🎮',
+            totalCorrectAnswers: '✅'
+        };
+
+        const embed = new EmbedBuilder()
+            .setColor(config.branding.color)
+            .setTitle(`${sortEmojis[sortBy]} All-Time Leaderboard - ${sortNames[sortBy]}`)
+            .setDescription(`Top players sorted by ${sortNames[sortBy]}`)
+            .setFooter({ text: config.branding.name })
+            .setTimestamp();
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const leaderboardText = leaderboard.map((player, index) => {
+            const medal = medals[index] || `${index + 1}.`;
+            const mainValue = player[sortBy];
+            
+            // Format the display based on sort type
+            let displayValue;
+            if (sortBy === 'accuracyRate') {
+                displayValue = `${mainValue}%`;
+            } else {
+                displayValue = mainValue.toString();
+            }
+            
+            // Add context stats
+            const contextStats = [];
+            if (sortBy !== 'totalScore') contextStats.push(`${player.totalScore} pts`);
+            if (sortBy !== 'totalWins') contextStats.push(`${player.totalWins} wins`);
+            if (sortBy !== 'totalGames') contextStats.push(`${player.totalGames} games`);
+            if (sortBy !== 'accuracyRate') contextStats.push(`${player.accuracyRate}% accuracy`);
+            
+            const context = contextStats.length > 0 ? ` (${contextStats.join(', ')})` : '';
+            
+            return `${medal} **${player.username}** - ${displayValue}${context}`;
+        }).join('\n');
+
+        embed.setDescription(leaderboardText);
 
         await interaction.editReply({ embeds: [embed] });
         return;
@@ -287,7 +364,7 @@ async function handleSlashCommand(interaction) {
             .addFields(
                 {
                     name: '📋 Commands',
-                    value: '`/namethatartist` - Start a new game\n`/leaderboard` - View top players\n`/stats` - View your stats\n`/stopgame` - Stop current game\n`/ping` - Check bot status\n`/help` - Show this message',
+                    value: '`/namethatartist` - Start a new game\n`/leaderboard` - View top players by score\n`/alltime` - View all-time leaderboards with sorting options\n`/stats` - View your personal stats\n`/stopgame` - Stop current game\n`/ping` - Check bot status\n`/help` - Show this message',
                 },
                 {
                     name: '🎮 How to Play',
