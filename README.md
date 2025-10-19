@@ -13,6 +13,8 @@ A Discord trivia bot that challenges players to identify artists behind NFTs fro
 - 💾 **Token caching** - Automatic refresh every 24 hours
 - 🎨 **TTC branding** - Tezos community themed throughout
 - ⚡ **Built for Node.js** - Discord.js v14 with ES6 modules
+- 🛡️ **Anti-spam protection** - Command cooldowns prevent abuse
+- 👮 **Admin controls** - Moderators can bypass cooldowns and manage games
 
 ## 🚀 Quick Start
 
@@ -88,6 +90,29 @@ npm run dev
 - `/ping` - Check if the bot is responsive
 - `/help` - Get help and information about the game
 
+## 🛡️ Anti-Spam & Moderation
+
+The bot includes built-in protection against spam and abuse:
+
+### Command Cooldowns
+
+Commands have cooldowns to prevent spam:
+- **Game Start** (`/namethatartist`): 30 seconds per user, 5 seconds per channel
+- **Leaderboard** (`/leaderboard`): 10 seconds per user
+- **Stats** (`/stats`): 5 seconds per user
+- **Stop Game** (`/stopgame`): 3 seconds per user
+- **Help** (`/help`): 10 seconds per user
+- **Ping** (`/ping`): 5 seconds per user
+
+### Admin Features
+
+Users with **Administrator** or **Manage Messages** permissions can:
+- Bypass all command cooldowns
+- Stop any active game in their channels
+- Help moderate game sessions
+
+Cooldown settings can be customized in `config.js` under the `cooldowns` section.
+
 ## 🏗️ Project Structure
 
 ```
@@ -98,7 +123,8 @@ Name-That-Artist/
 ├── deploy-commands.js    # Slash command registration
 ├── services/
 │   ├── objkt-api.js      # objkt.com GraphQL API integration
-│   └── storage.js        # Local JSON storage for data persistence
+│   ├── storage.js        # Local JSON storage for data persistence
+│   └── cooldown.js       # Command cooldown and anti-spam management
 ├── data/                 # Auto-generated data files (gitignored)
 │   ├── tokens.json       # Cached NFT tokens
 │   ├── players.json      # Player statistics
