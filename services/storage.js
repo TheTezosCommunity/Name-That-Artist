@@ -311,7 +311,7 @@ export async function getAllGameStates() {
     const data = await readJSON(GAME_STATE_FILE, null);
     
     // If main file doesn't exist, try rebuilding from append log
-    if (!data) {
+    if (data === null) {
         try {
             const logState = await rebuildStateFromLog('game_state');
             if (Object.keys(logState).length > 0) {
