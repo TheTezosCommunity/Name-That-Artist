@@ -117,7 +117,7 @@ export class NameThatArtistGame {
         }
 
         // Use provided rounds or default to config value
-        const totalRounds = rounds || config.game.roundsPerGame;
+        const totalRounds = rounds ?? config.game.roundsPerGame;
 
         // Check if we have enough tokens
         if (this.tokens.length < totalRounds) {

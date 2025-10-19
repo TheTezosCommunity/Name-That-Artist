@@ -150,7 +150,7 @@ async function handleSlashCommand(interaction) {
         await interaction.deferReply();
 
         // Get optional rounds parameter from slash command
-        const rounds = interaction.options.getInteger('rounds') || null;
+        const rounds = interaction.options.getInteger('rounds');
 
         const result = await gameManager.startGame(
             interaction.channelId,
