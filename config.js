@@ -45,6 +45,45 @@ export const config = {
         color: 0x2C7DF6, // Tezos blue
         emoji: '🎨',
     },
+    
+    // Cooldown settings (in seconds)
+    cooldowns: {
+        // Permissions that allow bypassing cooldowns
+        bypassPermissions: ['Administrator', 'ManageMessages'],
+        
+        // Command-specific cooldowns
+        commands: {
+            // Start game command - prevent spam
+            namethatartist: {
+                user: 30,      // Per-user cooldown: 30 seconds
+                channel: 5,    // Per-channel cooldown: 5 seconds (prevents rapid game creation)
+            },
+            // Leaderboard command - reduce API spam
+            leaderboard: {
+                user: 10,      // Per-user cooldown: 10 seconds
+                channel: 0,    // No channel cooldown
+            },
+            // Stats command - personal stats, light rate limiting
+            stats: {
+                user: 5,       // Per-user cooldown: 5 seconds
+                channel: 0,    // No channel cooldown
+            },
+            // Stop game - moderator action, minimal cooldown
+            stopgame: {
+                user: 3,       // Per-user cooldown: 3 seconds
+                channel: 0,    // No channel cooldown
+            },
+            // Help and ping - very light rate limiting
+            help: {
+                user: 10,      // Per-user cooldown: 10 seconds
+                channel: 0,    // No channel cooldown
+            },
+            ping: {
+                user: 5,       // Per-user cooldown: 5 seconds
+                channel: 0,    // No channel cooldown
+            },
+        },
+    },
 };
 
 // Validate required configuration

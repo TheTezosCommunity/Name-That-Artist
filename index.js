@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Events, ActionRowBuilder, ButtonBuilder, But
 import { config, validateConfig } from './config.js';
 import { gameManager } from './game.js';
 import { getLeaderboard, getPlayerStats } from './services/storage.js';
+import { cooldownManager } from './services/cooldown.js';
 
 // Validate required environment variables
 if (!validateConfig()) {
@@ -95,6 +96,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
  */
 async function handleSlashCommand(interaction) {
     const { commandName } = interaction;
+
+    // Check if user can bypass cooldowns (admins/moderators)
+    const canBypass = cooldownManager.canBypassCooldown(interaction);
+
+    // Check user cooldown (unless bypassed)
+    if (!canBypass) {
+        const userCooldown = cooldownManager.checkUserCooldown(commandName, interaction.user.id);
+        if (userCooldown.onCooldown) {
+            await interaction.reply({
+                content: `⏱️ Please wait ${cooldownManager.formatTime(userCooldown.remainingTime)} before using this command again.`,
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Check channel cooldown (unless bypassed)
+        const channelCooldown = cooldownManager.checkChannelCooldown(commandName, interaction.channelId);
+        if (channelCooldown.onCooldown) {
+            await interaction.reply({
+                content: `⏱️ This command was recently used in this channel. Please wait ${cooldownManager.formatTime(channelCooldown.remainingTime)}.`,
+                ephemeral: true
+            });
+            return;
+        }
+    }
+
+    // Set cooldowns after validation (before command execution)
+    if (!canBypass) {
+        cooldownManager.setUserCooldown(commandName, interaction.user.id);
+        cooldownManager.setChannelCooldown(commandName, interaction.channelId);
+    }
 
     // Ping command
     if (commandName === 'ping') {
@@ -252,6 +284,10 @@ async function handleSlashCommand(interaction) {
                 {
                     name: '🎮 How to Play',
                     value: `• Each game has ${config.game.roundsPerGame} rounds\n• You have ${config.game.roundTimeSeconds} seconds per round\n• Click the correct artist button\n• Faster answers = more points!\n• Only one answer per round`,
+                },
+                {
+                    name: '⏱️ Cooldowns',
+                    value: 'Commands have cooldowns to prevent spam:\n• Game start: 30s per user, 5s per channel\n• Leaderboard: 10s per user\n• Stats: 5s per user\n• Admins/Moderators bypass cooldowns',
                 },
                 {
                     name: '🏆 About',
