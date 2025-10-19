@@ -99,9 +99,10 @@ export class NameThatArtistGame {
      * @param {string} channelId - Discord channel ID
      * @param {string} userId - Discord user ID who started the game
      * @param {string} username - Discord username
+     * @param {number} rounds - Number of rounds to play (optional, defaults to config value)
      * @returns {Object} Game session data
      */
-    async startGame(channelId, userId, username) {
+    async startGame(channelId, userId, username, rounds = null) {
         // Check if game is initialized
         if (!this.isInitialized) {
             await this.initialize();
@@ -115,16 +116,19 @@ export class NameThatArtistGame {
             };
         }
 
+        // Use provided rounds or default to config value
+        const totalRounds = rounds ?? config.game.roundsPerGame;
+
         // Check if we have enough tokens
-        if (this.tokens.length < config.game.roundsPerGame) {
+        if (this.tokens.length < totalRounds) {
             return {
                 success: false,
-                message: `Not enough tokens to start a game. Need at least ${config.game.roundsPerGame} tokens.`,
+                message: `Not enough tokens to start a game. Need at least ${totalRounds} tokens.`,
             };
         }
 
         // Select random tokens for this game (no repeats)
-        const gameTokens = this.selectRandomTokens(config.game.roundsPerGame);
+        const gameTokens = this.selectRandomTokens(totalRounds);
 
         // Create game session
         const session = {
@@ -133,7 +137,7 @@ export class NameThatArtistGame {
             startedByUsername: username,
             startTime: Date.now(),
             currentRound: 0,
-            totalRounds: config.game.roundsPerGame,
+            totalRounds: totalRounds,
             rounds: gameTokens.map((token) => ({
                 token,
                 choices: this.generateChoices(token),

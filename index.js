@@ -149,10 +149,14 @@ async function handleSlashCommand(interaction) {
     if (commandName === 'namethatartist') {
         await interaction.deferReply();
 
+        // Get optional rounds parameter from slash command
+        const rounds = interaction.options.getInteger('rounds');
+
         const result = await gameManager.startGame(
             interaction.channelId,
             interaction.user.id,
-            interaction.user.username
+            interaction.user.username,
+            rounds
         );
 
         if (!result.success) {
@@ -166,7 +170,7 @@ async function handleSlashCommand(interaction) {
         const startEmbed = new EmbedBuilder()
             .setColor(config.branding.color)
             .setTitle('🎨 Name That Artist - Game Starting!')
-            .setDescription(`**${config.game.roundsPerGame} rounds** of Tezos NFT trivia!\n\nGet ready to guess the artists behind NFTs from The Tezos Community wallet.`)
+            .setDescription(`**${result.session.totalRounds} rounds** of Tezos NFT trivia!\n\nGet ready to guess the artists behind NFTs from The Tezos Community wallet.`)
             .addFields(
                 { name: '⏱️ Time per Round', value: `${config.game.roundTimeSeconds} seconds`, inline: true },
                 { name: '🎯 Scoring', value: `Up to ${config.game.baseScore} points per round`, inline: true },
@@ -364,11 +368,11 @@ async function handleSlashCommand(interaction) {
             .addFields(
                 {
                     name: '📋 Commands',
-                    value: '`/namethatartist` - Start a new game\n`/leaderboard` - View top players by score\n`/alltime` - View all-time leaderboards with sorting options\n`/stats` - View your personal stats\n`/stopgame` - Stop current game\n`/ping` - Check bot status\n`/help` - Show this message',
+                    value: '`/namethatartist [rounds]` - Start a new game (default: 20 rounds)\n`/leaderboard` - View top players by score\n`/alltime` - View all-time leaderboards with sorting options\n`/stats` - View your personal stats\n`/stopgame` - Stop current game\n`/ping` - Check bot status\n`/help` - Show this message',
                 },
                 {
                     name: '🎮 How to Play',
-                    value: `• Each game has ${config.game.roundsPerGame} rounds\n• You have ${config.game.roundTimeSeconds} seconds per round\n• Click the correct artist button\n• Faster answers = more points!\n• Only one answer per round`,
+                    value: `• Customize rounds (5-50) or use default (20)\n• You have ${config.game.roundTimeSeconds} seconds per round\n• Click the correct artist button\n• Faster answers = more points!\n• Only one answer per round`,
                 },
                 {
                     name: '⏱️ Cooldowns',
@@ -500,6 +504,10 @@ async function endRound(channel, channelId, message) {
  * End the game and show final results
  */
 async function endGame(channel, channelId, finalScores) {
+    // Get session to retrieve totalRounds before ending the game
+    const session = gameManager.getSession(channelId);
+    const totalRounds = session ? session.totalRounds : config.game.roundsPerGame;
+    
     await gameManager.endGame(channelId);
 
     const { winners, scores, totalPlayers } = finalScores;
@@ -507,7 +515,7 @@ async function endGame(channel, channelId, finalScores) {
     // Create winners announcement
     const winnerText = winners.length > 1 ?
         `🎉 **It's a tie!**\n${winners.map(w => `🏆 **${w.username}** - ${w.score} points`).join('\n')}` :
-        `🏆 **Winner: ${winners[0].username}**\n${winners[0].score} points • ${winners[0].correctAnswers}/${config.game.roundsPerGame} correct`;
+        `🏆 **Winner: ${winners[0].username}**\n${winners[0].score} points • ${winners[0].correctAnswers}/${totalRounds} correct`;
 
     const embed = new EmbedBuilder()
         .setColor(config.branding.color)

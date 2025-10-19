@@ -28,7 +28,7 @@ export const config = {
     
     // Game settings
     game: {
-        roundsPerGame: 10,          // Number of rounds in a game
+        roundsPerGame: 20,          // Number of rounds in a game (default)
         roundTimeSeconds: 15,       // Time per round in seconds
         multipleChoiceCount: 4,     // Number of answer choices (1 correct + 3 wrong)
         baseScore: 100,             // Base score per correct answer

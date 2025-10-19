@@ -18,7 +18,17 @@ const commands = [
     },
     {
         name: 'namethatartist',
-        description: 'Start a new Name That Artist game - 10 rounds of trivia!',
+        description: 'Start a new Name That Artist game - trivia with customizable rounds!',
+        options: [
+            {
+                name: 'rounds',
+                description: 'Number of rounds to play (default: 20, min: 5, max: 50)',
+                type: 4, // INTEGER type
+                required: false,
+                min_value: 5,
+                max_value: 50
+            }
+        ]
     },
     {
         name: 'leaderboard',
