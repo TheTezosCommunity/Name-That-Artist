@@ -93,7 +93,7 @@ export async function loadTokens() {
     const data = await readJSON(TOKENS_FILE, null);
     
     // If main file doesn't exist, try rebuilding from append log
-    if (!data) {
+    if (data === null) {
         try {
             const logState = await rebuildStateFromLog('tokens');
             if (Object.keys(logState).length > 0) {
