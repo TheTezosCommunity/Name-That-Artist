@@ -107,31 +107,33 @@ In your Discord server, try these commands:
 
 - `/help` - View all available commands
 - `/ping` - Check if the bot is responsive
-- `/namethatartist` - Start a game (currently uses placeholder data)
+- `/namethatartist` - Start a game (fetches real NFTs from TTC wallet!)
+- `/leaderboard` - View top players
+- `/stats` - View your personal statistics
 
-## Next Steps
+**Note**: On first run, the bot will fetch all NFTs from the TTC wallet. This may take a minute or two. Subsequent runs will use cached data.
 
-### Adding Real Artist Data
+## How the Game Works
 
-To add real Tezos artists to the game:
+### Data Flow
 
-1. Open `game.js`
-2. Find the `SAMPLE_ARTISTS` array
-3. Replace the placeholder data with real artist information:
+1. **Token Fetching**: Bot automatically fetches NFTs from the TTC wallet using objkt.com GraphQL API
+2. **Caching**: Tokens are cached in `data/tokens.json` for 24 hours
+3. **Game Creation**: When `/namethatartist` is run, the bot selects 10 random NFTs
+4. **Round Display**: Each round shows an NFT image and 4 artist choices (A/B/C/D)
+5. **Player Interaction**: Players click buttons to answer within 15 seconds
+6. **Scoring**: Correct answers earn points based on response speed
+7. **Results**: After 10 rounds, final scores and winners are announced
 
-```javascript
-const SAMPLE_ARTISTS = [
-    {
-        name: 'Artist Name',
-        artworks: [
-            'https://example.com/artwork1.jpg',
-            'https://example.com/artwork2.jpg'
-        ],
-        bio: 'Short bio about the artist'
-    },
-    // Add more artists...
-];
-```
+### Data Storage
+
+The bot stores data locally in JSON files:
+
+- `data/tokens.json` - Cached NFT tokens from the wallet
+- `data/players.json` - Player statistics and history
+- `data/game_state.json` - Active game sessions (for recovery)
+
+These files are automatically created and updated by the bot.
 
 ### Development Mode
 

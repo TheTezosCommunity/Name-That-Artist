@@ -13,19 +13,21 @@ This Discord bot foundation has been successfully set up for **The Tezos Communi
 - ✅ Modular code structure for easy maintenance
 
 ### Bot Features
-- ✅ Discord bot with proper intents (Guilds, Messages, MessageContent)
-- ✅ Slash command system (/namethatartist, /ping, /help, /hint, /stopgame)
-- ✅ Message-based game interaction (type guesses in chat)
-- ✅ Game session management (one game per channel)
-- ✅ Hint system (progressive hints based on artist name)
+- ✅ Discord bot with proper intents and button interactions
+- ✅ Slash command system (/namethatartist, /leaderboard, /stats, /stopgame, /ping, /help)
+- ✅ Button-based game interaction (click A/B/C/D buttons)
+- ✅ Multi-channel game support (one game per channel)
+- ✅ objkt.com GraphQL API integration
 - ✅ Permission-based game control (starter or moderators can stop games)
 
 ### Game Logic
-- ✅ NameThatArtistGame class with complete session management
-- ✅ Multiple attempt system (3 attempts per game)
-- ✅ Score tracking (attempts, time taken)
-- ✅ Automatic session cleanup
-- ✅ Extensible artist data structure
+- ✅ Multi-round gameplay (10 rounds per game)
+- ✅ Multiple-choice system (1 correct + 3 distractors)
+- ✅ Timed rounds (15 seconds per round)
+- ✅ Speed-based scoring (100 × time_remaining / total_time)
+- ✅ Real NFT data from TTC wallet (tz1RZN17j7FuPtDpGpXKgMXbx57WEhpZGF6B)
+- ✅ Token caching system (24-hour refresh)
+- ✅ Automatic round progression and game end handling
 
 ### TTC Branding
 - ✅ Custom bot name: "Name That Artist - TTC Edition"
@@ -69,23 +71,27 @@ npm install
 
 # Configure bot (edit .env with your Discord credentials)
 cp .env.example .env
+# Add your DISCORD_TOKEN and CLIENT_ID
 
 # Deploy slash commands to Discord
 npm run deploy-commands
 
-# Start the bot
+# Start the bot (will auto-fetch NFT data on first run)
 npm start
 
 # Or run in development mode (auto-restart)
 npm run dev
 ```
 
+**Note**: On first run, the bot will fetch all NFTs from the TTC wallet via objkt.com API. This takes 1-2 minutes. Subsequent runs will use cached data.
+
 ## 🎮 Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `/namethatartist` | Start a new Name That Artist game |
-| `/hint` | Get a hint for the current game |
+| `/namethatartist` | Start a new game (10 rounds of NFT trivia) |
+| `/leaderboard` | View top 10 players by total score |
+| `/stats` | View your personal statistics |
 | `/stopgame` | Stop the current game (starter or moderator only) |
 | `/ping` | Check bot responsiveness |
 | `/help` | Display help information |
@@ -93,7 +99,10 @@ npm run dev
 ## 🔧 Technology Stack
 
 - **Runtime**: Node.js v20+ (Bun compatible)
-- **Discord API**: Discord.js v14
+- **Discord API**: Discord.js v14 with button interactions
+- **Data Source**: objkt.com GraphQL API
+- **GraphQL Client**: graphql-request v6
+- **Storage**: Local JSON files (no database required)
 - **Configuration**: dotenv for environment variables
 - **Module System**: ES6 modules (type: "module")
 
@@ -101,41 +110,37 @@ npm run dev
 
 ### To Make It Production-Ready:
 
-1. **Add Real Artist Data**
-   - Open `game.js`
-   - Replace `SAMPLE_ARTISTS` with real Tezos artist data
-   - Use the format shown in `examples/artists-example.js`
-
-2. **Get Discord Credentials**
+1. **Get Discord Credentials**
    - Create a Discord application at https://discord.com/developers/applications
    - Copy your bot token and client ID
    - Add them to `.env` file
 
-3. **Deploy Commands**
+2. **Deploy Commands**
    - Run `npm run deploy-commands`
    - This registers slash commands with Discord
 
-4. **Invite Bot to Server**
+3. **Invite Bot to Server**
    - Use the OAuth2 URL Generator in Discord Developer Portal
    - Select scopes: `bot`, `applications.commands`
    - Select permissions: Send Messages, Embed Links, etc.
 
-5. **Test the Bot**
-   - Start with `npm start`
-   - Try `/help` command
-   - Start a game with `/namethatartist`
+4. **Start the Bot**
+   - Run `npm start`
+   - Bot will automatically fetch NFT data from TTC wallet (first run only)
+   - Try `/namethatartist` to start a game
+   - Use `/leaderboard` to see top players
 
 ### Future Enhancements (Optional):
 
-- 🗄️ Database integration for persistent leaderboards
-- 🏆 Scoring and ranking system
-- 📊 Statistics tracking
-- 🎯 Multiple difficulty levels
-- 🎨 Category system (by art style, medium, etc.)
-- ⏱️ Time-limited challenges
-- 🎁 Reward system
-- 🌐 Multi-language support
-- 📱 Enhanced mobile UI
+- 🗄️ Database migration (PostgreSQL/MongoDB) for scalability
+- 🎨 Category filters (art style, medium, date range)
+- 🌐 Multi-server leaderboards
+- 🎁 Role rewards for top players
+- 📱 Improved mobile button layout
+- 🔊 Voice channel integration
+- 🎯 Custom game modes (speed round, sudden death)
+- 🌍 Multi-language support
+- 📈 Advanced analytics dashboard
 
 ## 🔒 Security Notes
 
@@ -173,14 +178,17 @@ This project welcomes contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 ## 🎉 Success Criteria Met
 
 ✅ **Node/Bun/Discord.js stack**: Fully implemented with Node.js and Discord.js v14  
-✅ **Discord app foundation**: Complete bot infrastructure ready  
-✅ **Name That Artist game**: Core game logic implemented  
+✅ **Discord app foundation**: Complete bot infrastructure with button interactions  
+✅ **objkt.com integration**: GraphQL API fetching with pagination and caching  
+✅ **Multi-round gameplay**: 10 rounds with timed, multiple-choice questions  
+✅ **Scoring system**: Speed-based scoring (100 × time_remaining / total_time)  
+✅ **Leaderboard & stats**: Persistent JSON storage with player tracking  
 ✅ **TTC branding**: The Tezos Community branding throughout  
+✅ **Real NFT data**: Pulls from TTC wallet (tz1RZN17j7FuPtDpGpXKgMXbx57WEhpZGF6B)  
 ✅ **Documentation**: Comprehensive guides for setup and usage  
-✅ **Extensibility**: Easy to add real artist data and new features  
 
 ---
 
-**Status**: ✅ COMPLETE - Ready for deployment with real artist data
+**Status**: ✅ COMPLETE - Production-ready with all requirements implemented!
 
 Built with ❤️ for The Tezos Community
