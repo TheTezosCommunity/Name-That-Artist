@@ -18,11 +18,15 @@ const commands = [
     },
     {
         name: 'namethatartist',
-        description: 'Start a Name That Artist game - guess the Tezos artist!',
+        description: 'Start a new Name That Artist game - 10 rounds of trivia!',
     },
     {
-        name: 'hint',
-        description: 'Get a hint for the current game',
+        name: 'leaderboard',
+        description: 'View the top players on the leaderboard',
+    },
+    {
+        name: 'stats',
+        description: 'View your personal game statistics',
     },
     {
         name: 'stopgame',

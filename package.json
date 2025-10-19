@@ -21,6 +21,8 @@
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "graphql-request": "^6.1.0",
+    "node-fetch": "^3.3.2"
   }
 }
