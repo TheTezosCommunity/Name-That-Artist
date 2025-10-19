@@ -3,6 +3,10 @@ import { config, validateConfig } from './config.js';
 import { gameManager } from './game.js';
 import { getLeaderboard, getPlayerStats } from './services/storage.js';
 import { cooldownManager } from './services/cooldown.js';
+import { CompactionScheduler } from './services/append-log.js';
+
+// Initialize compaction scheduler for periodic log optimization
+const compactionScheduler = new CompactionScheduler(3600000); // Run every hour
 
 // Validate required environment variables
 if (!validateConfig()) {
@@ -37,6 +41,10 @@ client.once(Events.ClientReady, async (readyClient) => {
     } catch (error) {
         console.error('⚠️ Warning: Failed to initialize game data:', error.message);
     }
+    
+    // Start background compaction scheduler
+    console.log('\n🗜️ Starting background compaction scheduler...');
+    compactionScheduler.start(['players', 'tokens', 'game_state']);
 });
 
 // Handle errors
@@ -454,12 +462,14 @@ client.login(config.token)
 // Handle process termination
 process.on('SIGINT', () => {
     console.log('\n\n👋 Shutting down gracefully...');
+    compactionScheduler.stop();
     client.destroy();
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
     console.log('\n\n👋 Shutting down gracefully...');
+    compactionScheduler.stop();
     client.destroy();
     process.exit(0);
 });

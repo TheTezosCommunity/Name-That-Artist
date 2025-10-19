@@ -11,6 +11,7 @@ A Discord trivia bot that challenges players to identify artists behind NFTs fro
 - 🏆 **Persistent leaderboard** - Track top players across games
 - 📊 **Player statistics** - View your stats and win rate
 - 💾 **Token caching** - Automatic refresh every 24 hours
+- 💿 **Progressive storage** - Append-only logs for durability and crash recovery
 - 🎨 **TTC branding** - Tezos community themed throughout
 - ⚡ **Built for Node.js** - Discord.js v14 with ES6 modules
 - 🛡️ **Anti-spam protection** - Command cooldowns prevent abuse
@@ -181,6 +182,13 @@ Contributions are welcome! Feel free to:
 - Suggest new features
 - Submit pull requests
 - Improve documentation
+
+## 📚 Additional Documentation
+
+- [Progressive Storage System](./PROGRESSIVE_STORAGE.md) - Details about the append-only log system for durability
+- [Setup Guide](./SETUP.md) - Detailed setup instructions
+- [Game Guide](./GAME_GUIDE.md) - How to play the game
+- [Contributing Guide](./CONTRIBUTING.md) - How to contribute to the project
 
 ## 📄 License
 

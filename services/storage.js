@@ -1,11 +1,13 @@
 /**
  * Local Storage Service
  * Manages JSON files for tokens, players, and game state
+ * Now with progressive append-only log support for durability
  */
 
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { appendLogEntry, rebuildStateFromLog, compactLog, OpType } from './append-log.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +60,7 @@ async function writeJSON(filePath, data) {
 // ===== TOKENS =====
 
 /**
- * Save tokens to file
+ * Save tokens to file with progressive append-only logging
  * @param {Array} tokens - Array of token objects
  * @param {Object} artistInfo - Optional artist info map (address -> info)
  */
@@ -73,15 +75,36 @@ export async function saveTokens(tokens, artistInfo = null) {
         data.artistInfo = artistInfo;
     }
     
+    // Write to both append log (for durability) and main file (for compatibility)
+    await appendLogEntry('tokens', {
+        op: OpType.SET,
+        data: data
+    });
+    
     await writeJSON(TOKENS_FILE, data);
 }
 
 /**
- * Load tokens from file
+ * Load tokens from file with fallback to append log
  * @returns {Promise<Object|null>} Tokens data or null
  */
 export async function loadTokens() {
-    return await readJSON(TOKENS_FILE, null);
+    // Try loading from main file first
+    const data = await readJSON(TOKENS_FILE, null);
+    
+    // If main file doesn't exist, try rebuilding from append log
+    if (data === null) {
+        try {
+            const logState = await rebuildStateFromLog('tokens');
+            if (Object.keys(logState).length > 0) {
+                return logState;
+            }
+        } catch (error) {
+            console.error('Failed to rebuild from log:', error);
+        }
+    }
+    
+    return data;
 }
 
 /**
@@ -101,18 +124,39 @@ export async function needsTokenRefresh() {
 // ===== PLAYERS =====
 
 /**
- * Load all player data
+ * Load all player data with fallback to append log
  * @returns {Promise<Object>} Player data keyed by user ID
  */
 export async function loadPlayers() {
-    return await readJSON(PLAYERS_FILE, {});
+    // Try loading from main file first
+    const data = await readJSON(PLAYERS_FILE, null);
+    
+    // If main file doesn't exist, try rebuilding from append log
+    if (!data) {
+        try {
+            const logState = await rebuildStateFromLog('players');
+            if (Object.keys(logState).length > 0) {
+                return logState;
+            }
+        } catch (error) {
+            console.error('Failed to rebuild from log:', error);
+        }
+        return {};
+    }
+    
+    return data;
 }
 
 /**
- * Save player data
+ * Save player data with progressive append-only logging
  * @param {Object} players - Player data object
  */
 export async function savePlayers(players) {
+    // Removed redundant append log entry for full players object
+    
+    
+    
+    
     await writeJSON(PLAYERS_FILE, players);
 }
 
@@ -136,7 +180,7 @@ export async function getPlayerStats(userId) {
 }
 
 /**
- * Update player stats after a game
+ * Update player stats after a game with progressive writes
  * @param {string} userId - Discord user ID
  * @param {string} username - Discord username
  * @param {number} score - Score from the game
@@ -177,6 +221,14 @@ export async function updatePlayerStats(userId, username, score, isWinner = fals
     }
     
     players[userId] = stats;
+    
+    // Progressive write: append individual player update to log immediately
+    await appendLogEntry('players', {
+        op: OpType.SET,
+        key: userId,
+        value: stats
+    });
+    
     await savePlayers(players);
     
     return stats;
@@ -200,16 +252,25 @@ export async function getLeaderboard(sortBy = 'totalScore', limit = 10) {
 // ===== GAME STATE =====
 
 /**
- * Save current game state
+ * Save current game state with progressive append-only logging
  * @param {string} channelId - Discord channel ID
  * @param {Object} state - Game state object
  */
 export async function saveGameState(channelId, state) {
     const allStates = await readJSON(GAME_STATE_FILE, {});
-    allStates[channelId] = {
+    const updatedState = {
         ...state,
         lastUpdated: new Date().toISOString()
     };
+    allStates[channelId] = updatedState;
+    
+    // Progressive write: append individual game state update immediately
+    await appendLogEntry('game_state', {
+        op: OpType.SET,
+        key: channelId,
+        value: updatedState
+    });
+    
     await writeJSON(GAME_STATE_FILE, allStates);
 }
 
@@ -224,19 +285,62 @@ export async function loadGameState(channelId) {
 }
 
 /**
- * Clear game state for a channel
+ * Clear game state for a channel with tombstone record
  * @param {string} channelId - Discord channel ID
  */
 export async function clearGameState(channelId) {
     const allStates = await readJSON(GAME_STATE_FILE, {});
     delete allStates[channelId];
+    
+    // Tombstone record: mark as deleted in append log
+    await appendLogEntry('game_state', {
+        op: OpType.DELETE,
+        key: channelId
+    });
+    
     await writeJSON(GAME_STATE_FILE, allStates);
 }
 
 /**
- * Get all active game states
+ * Get all active game states with fallback to append log
  * @returns {Promise<Object>} All game states
  */
 export async function getAllGameStates() {
-    return await readJSON(GAME_STATE_FILE, {});
+    // Try loading from main file first
+    const data = await readJSON(GAME_STATE_FILE, null);
+    
+    // If main file doesn't exist, try rebuilding from append log
+    if (data === null) {
+        try {
+            const logState = await rebuildStateFromLog('game_state');
+            if (Object.keys(logState).length > 0) {
+                return logState;
+            }
+        } catch (error) {
+            console.error('Failed to rebuild from log:', error);
+        }
+        return {};
+    }
+    
+    return data;
+}
+
+/**
+ * Manually trigger compaction for all logs
+ * Can be called periodically or when needed
+ */
+export async function compactAllLogs() {
+    console.log('🗜️ Starting manual compaction of all logs...');
+    
+    const logs = ['players', 'tokens', 'game_state'];
+    for (const logName of logs) {
+        try {
+            await compactLog(logName);
+            console.log(`✅ Compacted ${logName} log`);
+        } catch (error) {
+            console.error(`❌ Error compacting ${logName}:`, error);
+        }
+    }
+    
+    console.log('✅ Manual compaction complete');
 }

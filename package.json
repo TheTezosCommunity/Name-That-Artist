@@ -7,7 +7,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "deploy-commands": "node deploy-commands.js"
+    "deploy-commands": "node deploy-commands.js",
+    "test": "node tests/append-log.test.js && node tests/storage-integration.test.js",
+    "test:append-log": "node tests/append-log.test.js",
+    "test:storage": "node tests/storage-integration.test.js",
+    "verify": "node tests/manual-verification.js"
   },
   "keywords": [
     "discord",
