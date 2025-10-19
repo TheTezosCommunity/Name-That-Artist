@@ -7,6 +7,34 @@ import { GraphQLClient, gql } from 'graphql-request';
 
 const OBJKT_GRAPHQL_ENDPOINT = 'https://data.objkt.com/v3/graphql';
 const TTC_WALLET_ADDRESS = 'tz1RZN17j7FuPtDpGpXKgMXbx57WEhpZGF6B';
+const IPFS_GATEWAY = 'https://ipfs.fileship.xyz';
+
+/**
+ * Convert IPFS URI to a gateway URL
+ * @param {string} uri - IPFS URI (e.g., 'ipfs://Qm...' or 'ipfs://ipfs/Qm...')
+ * @returns {string} Gateway URL (e.g., 'https://ipfs.fileship.xyz/Qm...')
+ */
+function convertIpfsToGateway(uri) {
+    if (!uri || typeof uri !== 'string') {
+        return uri;
+    }
+    
+    // Handle ipfs:// URIs
+    if (uri.startsWith('ipfs://')) {
+        // Remove 'ipfs://' prefix
+        let cid = uri.slice(7);
+        
+        // Some URIs may have an extra '/ipfs/' prefix after 'ipfs://'
+        if (cid.startsWith('ipfs/')) {
+            cid = cid.slice(5);
+        }
+        
+        return `${IPFS_GATEWAY}/${cid}`;
+    }
+    
+    // Return as-is if not an IPFS URI
+    return uri;
+}
 
 // GraphQL client
 const client = new GraphQLClient(OBJKT_GRAPHQL_ENDPOINT);
@@ -129,7 +157,7 @@ export function normalizeToken(token) {
         tokenId: token.token_id,
         name: token.name || 'Untitled',
         description: token.description || '',
-        imageUrl: imageUrl?.replace('ipfs://', 'https://ipfs.io/ipfs/') || null,
+        imageUrl: convertIpfsToGateway(imageUrl) || null,
         artists: artists,
         primaryArtist: primaryArtist,
         contract: token.fa_contract
