@@ -9,7 +9,8 @@ A Discord trivia bot that challenges players to identify artists behind NFTs fro
 - 🔘 **Button-based UI** - Multiple choice answers (A/B/C/D)
 - ⏱️ **Speed-based scoring** - Faster answers earn more points
 - 🏆 **Persistent leaderboard** - Track top players across games
-- 📊 **Player statistics** - View your stats and win rate
+- 📊 **Comprehensive statistics** - Track wins, accuracy, correct/incorrect answers
+- 🎯 **All-time leaderboards** - Multiple sorting options for different achievements
 - 💾 **Token caching** - Automatic refresh every 24 hours
 - 💿 **Progressive storage** - Append-only logs for durability and crash recovery
 - 🎨 **TTC branding** - Tezos community themed throughout
@@ -86,6 +87,14 @@ npm run dev
 
 - `/namethatartist` - Start a new game (10 rounds of trivia)
 - `/leaderboard` - View top players by total score
+- `/alltime [sort]` - View all-time leaderboards with various sorting options:
+  - Total Score (default)
+  - Total Wins
+  - Average Score
+  - Best Score
+  - Accuracy Rate
+  - Games Played
+  - Correct Answers
 - `/stats` - View your personal game statistics
 - `/stopgame` - Stop the current game (starter or moderator only)
 - `/ping` - Check if the bot is responsive
@@ -100,6 +109,7 @@ The bot includes built-in protection against spam and abuse:
 Commands have cooldowns to prevent spam:
 - **Game Start** (`/namethatartist`): 30 seconds per user, 5 seconds per channel
 - **Leaderboard** (`/leaderboard`): 10 seconds per user
+- **All-Time Stats** (`/alltime`): 10 seconds per user
 - **Stats** (`/stats`): 5 seconds per user
 - **Stop Game** (`/stopgame`): 3 seconds per user
 - **Help** (`/help`): 10 seconds per user
@@ -158,6 +168,34 @@ This bot is created for **The Tezos Community (TTC)**, celebrating the vibrant a
 6. **Timed Answers**: Players have 15 seconds to click the correct button
 7. **Scoring**: Points = 100 × (time_remaining / total_time)
 8. **Leaderboard**: Scores are saved and tracked across games
+
+## 📊 All-Time Statistics
+
+The bot tracks comprehensive player statistics across all games:
+
+### Tracked Metrics
+
+- **Total Games Played** - How many games you've participated in
+- **Total Wins** - Number of games won (highest score)
+- **Total Score** - Cumulative points across all games
+- **Average Score** - Mean score per game
+- **Best Score** - Your personal high score
+- **Correct Answers** - Total number of correct answers across all games
+- **Incorrect Answers** - Total number of wrong answers
+- **Accuracy Rate** - Percentage of correct answers
+
+### Leaderboard Views
+
+Use `/alltime` with different sorting options to see who leads in:
+- 📈 **Total Score** - Most points accumulated (default)
+- 🏆 **Total Wins** - Most games won
+- 📊 **Average Score** - Highest average performance
+- ⭐ **Best Score** - Highest single-game score
+- 🎯 **Accuracy Rate** - Best answer accuracy
+- 🎮 **Games Played** - Most active players
+- ✅ **Correct Answers** - Most questions answered correctly
+
+All statistics are stored using a progressive flat-file system with append-only logs for durability and crash recovery.
 
 ## 📝 Development
 

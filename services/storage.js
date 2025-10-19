@@ -167,7 +167,10 @@ export async function savePlayers(players) {
  */
 export async function getPlayerStats(userId) {
     const players = await loadPlayers();
-    return players[userId] || {
+    const existingPlayer = players[userId];
+    
+    // Default structure
+    const defaultStats = {
         userId,
         username: null,
         totalGames: 0,
@@ -175,8 +178,22 @@ export async function getPlayerStats(userId) {
         totalScore: 0,
         averageScore: 0,
         bestScore: 0,
+        totalCorrectAnswers: 0,
+        totalIncorrectAnswers: 0,
+        totalAnswers: 0,
+        accuracyRate: 0,
         gamesHistory: []
     };
+    
+    // Merge existing data with defaults (for backward compatibility)
+    if (existingPlayer) {
+        return {
+            ...defaultStats,
+            ...existingPlayer
+        };
+    }
+    
+    return defaultStats;
 }
 
 /**
@@ -185,10 +202,15 @@ export async function getPlayerStats(userId) {
  * @param {string} username - Discord username
  * @param {number} score - Score from the game
  * @param {boolean} isWinner - Whether player won
+ * @param {number} correctAnswers - Number of correct answers in this game
+ * @param {number} incorrectAnswers - Number of incorrect answers in this game
  */
-export async function updatePlayerStats(userId, username, score, isWinner = false) {
+export async function updatePlayerStats(userId, username, score, isWinner = false, correctAnswers = 0, incorrectAnswers = 0) {
     const players = await loadPlayers();
-    const stats = players[userId] || {
+    const existingStats = players[userId];
+    
+    // Default structure
+    const defaultStats = {
         userId,
         username,
         totalGames: 0,
@@ -196,14 +218,29 @@ export async function updatePlayerStats(userId, username, score, isWinner = fals
         totalScore: 0,
         averageScore: 0,
         bestScore: 0,
+        totalCorrectAnswers: 0,
+        totalIncorrectAnswers: 0,
+        totalAnswers: 0,
+        accuracyRate: 0,
         gamesHistory: []
     };
+    
+    // Merge with existing data for backward compatibility
+    const stats = existingStats ? { ...defaultStats, ...existingStats } : defaultStats;
     
     stats.username = username; // Update username if it changed
     stats.totalGames++;
     stats.totalScore += score;
     stats.averageScore = Math.round(stats.totalScore / stats.totalGames);
     stats.bestScore = Math.max(stats.bestScore, score);
+    
+    // Update answer statistics
+    stats.totalCorrectAnswers += correctAnswers;
+    stats.totalIncorrectAnswers += incorrectAnswers;
+    stats.totalAnswers = stats.totalCorrectAnswers + stats.totalIncorrectAnswers;
+    stats.accuracyRate = stats.totalAnswers > 0 
+        ? Math.round((stats.totalCorrectAnswers / stats.totalAnswers) * 100) 
+        : 0;
     
     if (isWinner) {
         stats.totalWins++;
@@ -212,7 +249,9 @@ export async function updatePlayerStats(userId, username, score, isWinner = fals
     stats.gamesHistory.push({
         date: new Date().toISOString(),
         score,
-        isWinner
+        isWinner,
+        correctAnswers,
+        incorrectAnswers
     });
     
     // Keep only last 50 games
