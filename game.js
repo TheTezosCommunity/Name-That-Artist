@@ -4,9 +4,15 @@
  * Multi-round, multiple-choice trivia game
  */
 
-import { config } from './config.js';
-import { loadTokens, needsTokenRefresh } from './services/storage.js';
-import { fetchAllTokens, normalizeToken, getUniqueArtists, getDistractors, batchResolveArtistNames } from './services/objkt-api.js';
+import { config } from "./config.js";
+import { loadTokens, needsTokenRefresh } from "./services/storage.js";
+import {
+    fetchAllTokens,
+    normalizeToken,
+    getUniqueArtists,
+    getDistractors,
+    batchResolveArtistNames,
+} from "./services/objkt-api.js";
 
 /**
  * Game class to manage Name That Artist game sessions
@@ -26,41 +32,41 @@ export class NameThatArtistGame {
     async initialize() {
         if (this.isInitialized) return;
 
-        console.log('🎮 Initializing Name That Artist game...');
+        console.log("🎮 Initializing Name That Artist game...");
 
         try {
             // Check if we need to refresh tokens
             const needsRefresh = await needsTokenRefresh();
-            
+
             if (needsRefresh) {
-                console.log('📥 Fetching fresh token data from objkt.com...');
+                console.log("📥 Fetching fresh token data from objkt.com...");
                 const rawTokens = await fetchAllTokens();
-                this.tokens = rawTokens.map(normalizeToken).filter(t => t.imageUrl);
-                
+                this.tokens = rawTokens.map(normalizeToken).filter((t) => t.imageUrl);
+
                 // Extract unique artists
                 const allArtists = getUniqueArtists(this.tokens);
-                
+
                 // Resolve artist names (alias/tzdomain)
-                console.log('🔍 Resolving artist information...');
+                console.log("🔍 Resolving artist information...");
                 this.artistInfo = await batchResolveArtistNames(allArtists);
-                
+
                 // Save to cache with artist info
-                const { saveTokens } = await import('./services/storage.js');
+                const { saveTokens } = await import("./services/storage.js");
                 await saveTokens(this.tokens, this.artistInfo);
             } else {
-                console.log('📂 Loading tokens from cache...');
+                console.log("📂 Loading tokens from cache...");
                 const data = await loadTokens();
                 this.tokens = data.tokens;
                 this.artistInfo = data.artistInfo || {};
-                
+
                 // If no artist info in cache, resolve it now
                 if (Object.keys(this.artistInfo).length === 0) {
                     const allArtists = getUniqueArtists(this.tokens);
-                    console.log('🔍 Resolving artist information (not in cache)...');
+                    console.log("🔍 Resolving artist information (not in cache)...");
                     this.artistInfo = await batchResolveArtistNames(allArtists);
-                    
+
                     // Update cache with artist info
-                    const { saveTokens } = await import('./services/storage.js');
+                    const { saveTokens } = await import("./services/storage.js");
                     await saveTokens(this.tokens, this.artistInfo);
                 }
             }
@@ -68,22 +74,22 @@ export class NameThatArtistGame {
             // Filter artists based on config
             const allArtists = getUniqueArtists(this.tokens);
             if (config.game.excludeUnresolvedArtists) {
-                this.artists = allArtists.filter(address => this.artistInfo[address]?.hasResolution);
+                this.artists = allArtists.filter((address) => this.artistInfo[address]?.hasResolution);
                 console.log(`   Filtered to ${this.artists.length} artists with alias/domain`);
-                
+
                 // Filter tokens to only include those with resolved artists
-                this.tokens = this.tokens.filter(token => 
-                    this.artistInfo[token.primaryArtist]?.hasResolution
-                );
+                this.tokens = this.tokens.filter((token) => this.artistInfo[token.primaryArtist]?.hasResolution);
                 console.log(`   Filtered to ${this.tokens.length} tokens with resolved artists`);
             } else {
                 this.artists = allArtists;
             }
-            
-            console.log(`✅ Game initialized with ${this.tokens.length} tokens and ${this.artists.length} unique artists`);
+
+            console.log(
+                `✅ Game initialized with ${this.tokens.length} tokens and ${this.artists.length} unique artists`
+            );
             this.isInitialized = true;
         } catch (error) {
-            console.error('❌ Failed to initialize game:', error);
+            console.error("❌ Failed to initialize game:", error);
             throw error;
         }
     }
@@ -105,7 +111,7 @@ export class NameThatArtistGame {
         if (this.activeSessions.has(channelId)) {
             return {
                 success: false,
-                message: 'A game is already in progress in this channel! Wait for it to finish.'
+                message: "A game is already in progress in this channel! Wait for it to finish.",
             };
         }
 
@@ -113,13 +119,13 @@ export class NameThatArtistGame {
         if (this.tokens.length < config.game.roundsPerGame) {
             return {
                 success: false,
-                message: `Not enough tokens to start a game. Need at least ${config.game.roundsPerGame} tokens.`
+                message: `Not enough tokens to start a game. Need at least ${config.game.roundsPerGame} tokens.`,
             };
         }
 
         // Select random tokens for this game (no repeats)
         const gameTokens = this.selectRandomTokens(config.game.roundsPerGame);
-        
+
         // Create game session
         const session = {
             channelId,
@@ -128,7 +134,7 @@ export class NameThatArtistGame {
             startTime: Date.now(),
             currentRound: 0,
             totalRounds: config.game.roundsPerGame,
-            rounds: gameTokens.map(token => ({
+            rounds: gameTokens.map((token) => ({
                 token,
                 choices: this.generateChoices(token),
                 startTime: null,
@@ -145,7 +151,7 @@ export class NameThatArtistGame {
 
         return {
             success: true,
-            session
+            session,
         };
     }
 
@@ -167,16 +173,16 @@ export class NameThatArtistGame {
     generateChoices(token) {
         const distractors = getDistractors(token, this.artists, config.game.multipleChoiceCount - 1);
         const choices = [token.primaryArtist, ...distractors];
-        
+
         // Shuffle choices
         const shuffled = choices.sort(() => 0.5 - Math.random());
-        
-        // Add labels (A, B, C, D)
-        const labels = ['🅰️', '🅱️', '🅲', '🅳'];
+
+        // Add labels (1, 2, 3, 4) using keycap digit emojis
+        const labels = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"];
         return shuffled.map((artist, index) => ({
             label: labels[index],
             artist,
-            isCorrect: artist === token.primaryArtist
+            isCorrect: artist === token.primaryArtist,
         }));
     }
 
@@ -190,31 +196,31 @@ export class NameThatArtistGame {
      */
     async processAnswer(channelId, userId, username, choiceLabel) {
         const session = this.activeSessions.get(channelId);
-        
+
         if (!session || !session.isActive) {
             return {
                 success: false,
-                message: 'No active game in this channel.'
+                message: "No active game in this channel.",
             };
         }
 
         const currentRound = session.rounds[session.currentRound];
-        
+
         // Check if user already answered this round
         if (currentRound.answered.has(userId)) {
             return {
                 success: false,
-                message: 'You have already answered this round!',
-                alreadyAnswered: true
+                message: "You have already answered this round!",
+                alreadyAnswered: true,
             };
         }
 
         // Find the selected choice
-        const selectedChoice = currentRound.choices.find(c => c.label === choiceLabel);
+        const selectedChoice = currentRound.choices.find((c) => c.label === choiceLabel);
         if (!selectedChoice) {
             return {
                 success: false,
-                message: 'Invalid choice.'
+                message: "Invalid choice.",
             };
         }
 
@@ -227,7 +233,7 @@ export class NameThatArtistGame {
                 username,
                 score: 0,
                 correctAnswers: 0,
-                incorrectAnswers: 0
+                incorrectAnswers: 0,
             });
         }
 
@@ -239,7 +245,7 @@ export class NameThatArtistGame {
             const timeElapsed = (Date.now() - currentRound.startTime) / 1000;
             const timeRemaining = Math.max(0, config.game.roundTimeSeconds - timeElapsed);
             const score = Math.round(config.game.baseScore * (timeRemaining / config.game.roundTimeSeconds));
-            
+
             player.score += score;
             player.correctAnswers++;
 
@@ -248,15 +254,15 @@ export class NameThatArtistGame {
                 correct: true,
                 score,
                 totalScore: player.score,
-                message: `✅ Correct! +${score} points`
+                message: `✅ Correct! +${score} points`,
             };
         } else {
             player.incorrectAnswers++;
-            
+
             return {
                 success: true,
                 correct: false,
-                message: `❌ Wrong answer!`
+                message: `❌ Wrong answer!`,
             };
         }
     }
@@ -268,11 +274,11 @@ export class NameThatArtistGame {
      */
     nextRound(channelId) {
         const session = this.activeSessions.get(channelId);
-        
+
         if (!session) {
             return {
                 success: false,
-                message: 'No active game in this channel.'
+                message: "No active game in this channel.",
             };
         }
 
@@ -284,7 +290,7 @@ export class NameThatArtistGame {
             return {
                 success: true,
                 gameOver: true,
-                finalScores: this.getFinalScores(session)
+                finalScores: this.getFinalScores(session),
             };
         }
 
@@ -297,7 +303,7 @@ export class NameThatArtistGame {
             gameOver: false,
             round: currentRound,
             roundNumber: session.currentRound + 1,
-            totalRounds: session.totalRounds
+            totalRounds: session.totalRounds,
         };
     }
 
@@ -309,9 +315,9 @@ export class NameThatArtistGame {
     getCurrentRound(channelId) {
         const session = this.activeSessions.get(channelId);
         if (!session) return null;
-        
+
         const currentRound = session.rounds[session.currentRound];
-        
+
         // Start timing if not started
         if (!currentRound.startTime) {
             currentRound.startTime = Date.now();
@@ -321,7 +327,7 @@ export class NameThatArtistGame {
             round: currentRound,
             roundNumber: session.currentRound + 1,
             totalRounds: session.totalRounds,
-            players: Array.from(session.players.values())
+            players: Array.from(session.players.values()),
         };
     }
 
@@ -336,7 +342,7 @@ export class NameThatArtistGame {
             username: data.username,
             score: data.score,
             correctAnswers: data.correctAnswers,
-            incorrectAnswers: data.incorrectAnswers
+            incorrectAnswers: data.incorrectAnswers,
         }));
 
         // Sort by score (descending)
@@ -344,12 +350,12 @@ export class NameThatArtistGame {
 
         // Determine winners (handle ties)
         const topScore = scores[0]?.score || 0;
-        const winners = scores.filter(s => s.score === topScore);
+        const winners = scores.filter((s) => s.score === topScore);
 
         return {
             scores,
             winners,
-            totalPlayers: scores.length
+            totalPlayers: scores.length,
         };
     }
 
@@ -362,24 +368,24 @@ export class NameThatArtistGame {
         const session = this.activeSessions.get(channelId);
         if (session) {
             session.isActive = false;
-            
+
             // Save final scores to storage
-            const { updatePlayerStats } = await import('./services/storage.js');
+            const { updatePlayerStats } = await import("./services/storage.js");
             const finalScores = this.getFinalScores(session);
-            
+
             for (const player of finalScores.scores) {
-                const isWinner = finalScores.winners.some(w => w.userId === player.userId);
+                const isWinner = finalScores.winners.some((w) => w.userId === player.userId);
                 await updatePlayerStats(
-                    player.userId, 
-                    player.username, 
-                    player.score, 
+                    player.userId,
+                    player.username,
+                    player.score,
                     isWinner,
                     player.correctAnswers,
                     player.incorrectAnswers
                 );
             }
         }
-        
+
         return this.activeSessions.delete(channelId);
     }
 
