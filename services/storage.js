@@ -152,11 +152,10 @@ export async function loadPlayers() {
  * @param {Object} players - Player data object
  */
 export async function savePlayers(players) {
-    // Write to append log for durability
-    await appendLogEntry('players', {
-        op: OpType.SET,
-        data: players
-    });
+    // Removed redundant append log entry for full players object
+    
+    
+    
     
     await writeJSON(PLAYERS_FILE, players);
 }
