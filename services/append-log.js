@@ -57,7 +57,14 @@ export async function appendLogEntry(logName, entry) {
     
     // Use append mode with fsync for durability
     // The 'a' flag ensures atomic append operations
-    await fs.appendFile(logPath, logLine, { encoding: 'utf8', flag: 'a' });
+    // Open file, write, fsync, and close for durability
+    const fd = fsSync.openSync(logPath, 'a');
+    try {
+        fsSync.writeSync(fd, logLine, null, 'utf8');
+        fsSync.fsyncSync(fd);
+    } finally {
+        fsSync.closeSync(fd);
+    }
 }
 
 /**
