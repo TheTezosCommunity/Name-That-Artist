@@ -3,11 +3,13 @@
  * Fetches NFT tokens from The Tezos Community wallet
  */
 
-import { GraphQLClient, gql } from 'graphql-request';
+import { GraphQLClient, gql } from "graphql-request";
+import rateKeeperPkg from "rate-keeper";
+const { default: RateKeeper, DropPolicy } = rateKeeperPkg;
 
-const OBJKT_GRAPHQL_ENDPOINT = 'https://data.objkt.com/v3/graphql';
-const TTC_WALLET_ADDRESS = 'tz1RZN17j7FuPtDpGpXKgMXbx57WEhpZGF6B';
-const IPFS_GATEWAY = 'https://ipfs.fileship.xyz';
+const OBJKT_GRAPHQL_ENDPOINT = "https://data.objkt.com/v3/graphql";
+const TTC_WALLET_ADDRESS = "tz1RZN17j7FuPtDpGpXKgMXbx57WEhpZGF6B";
+const IPFS_GATEWAY = "https://ipfs.fileship.xyz";
 
 /**
  * Convert IPFS URI to a gateway URL
@@ -15,23 +17,23 @@ const IPFS_GATEWAY = 'https://ipfs.fileship.xyz';
  * @returns {string} Gateway URL (e.g., 'https://ipfs.fileship.xyz/Qm...')
  */
 function convertIpfsToGateway(uri) {
-    if (!uri || typeof uri !== 'string') {
+    if (!uri || typeof uri !== "string") {
         return uri;
     }
-    
+
     // Handle ipfs:// URIs
-    if (uri.startsWith('ipfs://')) {
+    if (uri.startsWith("ipfs://")) {
         // Remove 'ipfs://' prefix
         let cid = uri.slice(7);
-        
+
         // Some URIs may have an extra '/ipfs/' prefix after 'ipfs://'
-        if (cid.startsWith('ipfs/')) {
+        if (cid.startsWith("ipfs/")) {
             cid = cid.slice(5);
         }
-        
+
         return `${IPFS_GATEWAY}/${cid}`;
     }
-    
+
     // Return as-is if not an IPFS URI
     return uri;
 }
@@ -39,42 +41,69 @@ function convertIpfsToGateway(uri) {
 // GraphQL client
 const client = new GraphQLClient(OBJKT_GRAPHQL_ENDPOINT);
 
+// Rate limiting configuration for objkt.com API
+// Based on observed 429 errors, using conservative rate limits
+const OBJKT_RATE_LIMIT_MS = 1000; // 1 second between requests
+const OBJKT_QUEUE_ID = "objkt-api";
+
+// Rate-limited request function
+const rateLimitedRequest = RateKeeper(
+    async (query, variables) => {
+        try {
+            return await client.request(query, variables);
+        } catch (error) {
+            // If we still get rate limited, throw with more context
+            if (error.response?.status === 429) {
+                console.warn("⚠️ Still hitting rate limits, consider increasing delay");
+                throw new Error(`Rate limit exceeded for objkt.com API. ${error.message}`);
+            }
+            throw error;
+        }
+    },
+    OBJKT_RATE_LIMIT_MS,
+    {
+        id: OBJKT_QUEUE_ID,
+        maxQueueSize: 100, // Reasonable queue size
+        dropPolicy: DropPolicy.Reject, // Reject if queue is full rather than dropping
+    }
+);
+
 /**
  * GraphQL query to fetch tokens from a wallet
  */
 const TOKENS_QUERY = gql`
-  query GetWalletTokens($address: String!, $limit: Int!, $offset: Int!) {
-    holder(where: {address: {_eq: $address}}) {
-      held_tokens(offset: $offset, limit: $limit, distinct_on: token_pk) {
-        token {
-          token_id
-          name
-          description
-          artifact_uri
-          display_uri
-          thumbnail_uri
-          fa_contract
-          creators {
-            creator_address
-          }
+    query GetWalletTokens($address: String!, $limit: Int!, $offset: Int!) {
+        holder(where: { address: { _eq: $address } }) {
+            held_tokens(offset: $offset, limit: $limit, distinct_on: token_pk) {
+                token {
+                    token_id
+                    name
+                    description
+                    artifact_uri
+                    display_uri
+                    thumbnail_uri
+                    fa_contract
+                    creators {
+                        creator_address
+                    }
+                }
+            }
         }
-      }
     }
-  }
 `;
 
 /**
  * GraphQL query to fetch artist info (alias, tzdomain, etc.)
  */
 const ARTIST_INFO_QUERY = gql`
-  query GetArtistInfo($address: String!) {
-    holder(where: {address: {_eq: $address}}) {
-      tzdomain
-      alias
-      description
-      logo
+    query GetArtistInfo($address: String!) {
+        holder(where: { address: { _eq: $address } }) {
+            tzdomain
+            alias
+            description
+            logo
+        }
     }
-  }
 `;
 
 /**
@@ -85,19 +114,19 @@ const ARTIST_INFO_QUERY = gql`
  */
 export async function fetchTokensFromWallet(limit = 100, offset = 0) {
     try {
-        const data = await client.request(TOKENS_QUERY, {
+        const data = await rateLimitedRequest(TOKENS_QUERY, {
             address: TTC_WALLET_ADDRESS,
             limit,
-            offset
+            offset,
         });
 
         if (!data.holder || !data.holder[0]) {
             return [];
         }
 
-        return data.holder[0].held_tokens.map(ht => ht.token);
+        return data.holder[0].held_tokens.map((ht) => ht.token);
     } catch (error) {
-        console.error('Error fetching tokens from objkt.com:', error);
+        console.error("Error fetching tokens from objkt.com:", error);
         throw error;
     }
 }
@@ -112,19 +141,19 @@ export async function fetchAllTokens(batchSize = 100) {
     let offset = 0;
     let hasMore = true;
 
-    console.log('📦 Fetching tokens from TTC wallet...');
+    console.log("📦 Fetching tokens from TTC wallet...");
 
     while (hasMore) {
         try {
             const tokens = await fetchTokensFromWallet(batchSize, offset);
-            
+
             if (tokens.length === 0) {
                 hasMore = false;
             } else {
                 allTokens.push(...tokens);
                 offset += tokens.length;
                 console.log(`   Fetched ${allTokens.length} tokens so far...`);
-                
+
                 // If we got less than the batch size, we've reached the end
                 if (tokens.length < batchSize) {
                     hasMore = false;
@@ -148,19 +177,19 @@ export async function fetchAllTokens(batchSize = 100) {
 export function normalizeToken(token) {
     // Get the best available image URL
     const imageUrl = token.display_uri || token.thumbnail_uri || token.artifact_uri;
-    
+
     // Extract artist addresses
-    const artists = token.creators?.map(c => c.creator_address) || [];
-    const primaryArtist = artists[0] || 'Unknown Artist';
+    const artists = token.creators?.map((c) => c.creator_address) || [];
+    const primaryArtist = artists[0] || "Unknown Artist";
 
     return {
         tokenId: token.token_id,
-        name: token.name || 'Untitled',
-        description: token.description || '',
+        name: token.name || "Untitled",
+        description: token.description || "",
         imageUrl: convertIpfsToGateway(imageUrl) || null,
         artists: artists,
         primaryArtist: primaryArtist,
-        contract: token.fa_contract
+        contract: token.fa_contract,
     };
 }
 
@@ -171,13 +200,13 @@ export function normalizeToken(token) {
  */
 export function getUniqueArtists(tokens) {
     const artistSet = new Set();
-    
-    tokens.forEach(token => {
+
+    tokens.forEach((token) => {
         if (token.artists && token.artists.length > 0) {
-            token.artists.forEach(artist => artistSet.add(artist));
+            token.artists.forEach((artist) => artistSet.add(artist));
         }
     });
-    
+
     return Array.from(artistSet);
 }
 
@@ -188,12 +217,12 @@ export function getUniqueArtists(tokens) {
  */
 export async function fetchArtistInfo(address) {
     try {
-        const data = await client.request(ARTIST_INFO_QUERY, { address });
-        
+        const data = await rateLimitedRequest(ARTIST_INFO_QUERY, { address });
+
         if (!data.holder || !data.holder[0]) {
             return null;
         }
-        
+
         return data.holder[0];
     } catch (error) {
         console.error(`Error fetching artist info for ${address}:`, error.message);
@@ -216,25 +245,25 @@ export async function resolveArtistName(address, artistInfoCache = {}) {
         const hasResolution = !!(info.alias || info.tzdomain);
         return { displayName, hasResolution, info };
     }
-    
+
     // Fetch artist info
     const info = await fetchArtistInfo(address);
-    
+
     if (!info) {
-        return { 
-            displayName: address, 
+        return {
+            displayName: address,
             hasResolution: false,
-            info: null
+            info: null,
         };
     }
-    
+
     // Store in cache
     artistInfoCache[address] = info;
-    
+
     // Priority: alias -> tzdomain -> wallet address
     const displayName = info.alias || info.tzdomain || address;
     const hasResolution = !!(info.alias || info.tzdomain);
-    
+
     return { displayName, hasResolution, info };
 }
 
@@ -245,27 +274,36 @@ export async function resolveArtistName(address, artistInfoCache = {}) {
  */
 export async function batchResolveArtistNames(addresses) {
     const artistInfoMap = {};
-    
+
     console.log(`🔍 Resolving artist names for ${addresses.length} unique artists...`);
-    
-    // Process in batches to avoid overwhelming the API
-    const batchSize = 10;
-    for (let i = 0; i < addresses.length; i += batchSize) {
-        const batch = addresses.slice(i, i + batchSize);
-        
-        await Promise.all(
-            batch.map(async (address) => {
-                const result = await resolveArtistName(address, artistInfoMap);
-                artistInfoMap[address] = result;
-            })
-        );
-        
-        console.log(`   Resolved ${Math.min(i + batchSize, addresses.length)}/${addresses.length} artists...`);
+    console.log(`⏱️ Using rate limiting (${OBJKT_RATE_LIMIT_MS}ms between requests) to avoid API limits...`);
+
+    // Process sequentially with rate limiting (no parallel processing to avoid rate limits)
+    // The rate limiting happens automatically in rateLimitedRequest
+    for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i];
+        try {
+            const result = await resolveArtistName(address, artistInfoMap);
+            artistInfoMap[address] = result;
+
+            // Log progress every 50 artists or at the end
+            if ((i + 1) % 50 === 0 || i === addresses.length - 1) {
+                console.log(`   Resolved ${i + 1}/${addresses.length} artists...`);
+            }
+        } catch (error) {
+            console.error(`   Failed to resolve artist ${address}:`, error.message);
+            // Continue with next artist, don't let one failure stop the whole process
+            artistInfoMap[address] = {
+                displayName: address,
+                hasResolution: false,
+                info: null,
+            };
+        }
     }
-    
-    const resolvedCount = Object.values(artistInfoMap).filter(a => a.hasResolution).length;
+
+    const resolvedCount = Object.values(artistInfoMap).filter((a) => a.hasResolution).length;
     console.log(`✅ Artist resolution complete: ${resolvedCount}/${addresses.length} resolved to alias/domain`);
-    
+
     return artistInfoMap;
 }
 
@@ -278,8 +316,8 @@ export async function batchResolveArtistNames(addresses) {
  */
 export function getDistractors(correctToken, allArtists, count = 3) {
     const correctArtist = correctToken.primaryArtist;
-    const availableArtists = allArtists.filter(artist => artist !== correctArtist);
-    
+    const availableArtists = allArtists.filter((artist) => artist !== correctArtist);
+
     // Shuffle and pick random distractors
     const shuffled = availableArtists.sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
