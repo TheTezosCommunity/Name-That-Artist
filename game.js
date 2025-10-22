@@ -102,7 +102,7 @@ export class NameThatArtistGame {
      * @param {number} rounds - Number of rounds to play (optional, defaults to config value)
      * @returns {Object} Game session data
      */
-    async startGame(channelId, userId, username, rounds = null) {
+    async startGame(channelId, userId, username, rounds = null, roundTime = null, betweenRoundTime = null) {
         // Check if game is initialized
         if (!this.isInitialized) {
             await this.initialize();
@@ -118,6 +118,8 @@ export class NameThatArtistGame {
 
         // Use provided rounds or default to config value
         const totalRounds = rounds ?? config.game.roundsPerGame;
+        const roundTimeSeconds = roundTime ?? config.game.roundTimeSeconds;
+        const delayBetweenRounds = betweenRoundTime ?? config.game.delayBetweenRounds;
 
         // Check if we have enough tokens
         if (this.tokens.length < totalRounds) {
@@ -138,6 +140,8 @@ export class NameThatArtistGame {
             startTime: Date.now(),
             currentRound: 0,
             totalRounds: totalRounds,
+            roundTimeSeconds,
+            delayBetweenRounds,
             rounds: gameTokens.map((token) => ({
                 token,
                 choices: this.generateChoices(token),

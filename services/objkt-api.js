@@ -175,8 +175,10 @@ export async function fetchAllTokens(batchSize = 100) {
  * @returns {Object} Normalized token data
  */
 export function normalizeToken(token) {
-    // Get the best available image URL
-    const imageUrl = token.display_uri || token.thumbnail_uri || token.artifact_uri;
+    // Prioritize thumbnail for faster loading, fallback to display_uri or artifact_uri
+    const thumbnailUrl = token.thumbnail_uri || token.display_uri || token.artifact_uri;
+    // Full image URL for precaching or higher quality display
+    const fullImageUrl = token.display_uri || token.artifact_uri || token.thumbnail_uri;
 
     // Extract artist addresses
     const artists = token.creators?.map((c) => c.creator_address) || [];
@@ -186,7 +188,8 @@ export function normalizeToken(token) {
         tokenId: token.token_id,
         name: token.name || "Untitled",
         description: token.description || "",
-        imageUrl: convertIpfsToGateway(imageUrl) || null,
+        imageUrl: convertIpfsToGateway(thumbnailUrl) || null,
+        fullImageUrl: convertIpfsToGateway(fullImageUrl) || null,
         artists: artists,
         primaryArtist: primaryArtist,
         contract: token.fa_contract,
