@@ -590,13 +590,16 @@ async function endRound(channel, channelId, message) {
 
     // Show correct answer
     const correctChoice = currentRound.choices.find((c) => c.isCorrect);
+    const token = currentRound.token;
+    const objktUrl = `https://objkt.com/tokens/${token.contract}/${token.tokenId}`;
+
     const resultEmbed = new EmbedBuilder()
         .setColor(config.branding.color)
         .setTitle("⏰ Time's Up!")
         .setDescription(
             `The correct answer was: **${correctChoice.label} ${gameManager.getArtistDisplayName(
                 correctChoice.artist
-            )}**`
+            )}**\n\n[View on objkt.com](${objktUrl})`
         )
         .setFooter({ text: "Get ready for the next round!" });
 
