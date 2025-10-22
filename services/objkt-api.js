@@ -75,12 +75,7 @@ const rateLimitedRequest = RateKeeper(
 const TOKENS_QUERY = gql`
     query GetWalletTokens($address: String!, $limit: Int!, $offset: Int!) {
         holder(where: { address: { _eq: $address } }) {
-            held_tokens(
-                offset: $offset
-                limit: $limit
-                distinct_on: token_pk
-                where: { quantity: { _gt: 0 } }
-            ) {
+            held_tokens(offset: $offset, limit: $limit, distinct_on: token_pk, where: { quantity: { _gt: 0 } }) {
                 quantity
                 token {
                     token_id
