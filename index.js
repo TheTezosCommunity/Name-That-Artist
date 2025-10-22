@@ -42,6 +42,12 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.log("\n🔄 Initializing game data...");
     try {
         await gameManager.initialize();
+
+        // Check if data needs refresh and start background update if needed
+        // This won't block - it runs in the background
+        gameManager.checkAndRefreshIfNeeded().catch((error) => {
+            console.error("⚠️ Background refresh check failed:", error.message);
+        });
     } catch (error) {
         console.error("⚠️ Warning: Failed to initialize game data:", error.message);
     }

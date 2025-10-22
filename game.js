@@ -24,22 +24,85 @@ export class NameThatArtistGame {
         this.artists = [];
         this.artistInfo = {}; // Map of address -> artist info (alias, tzdomain, etc.)
         this.isInitialized = false;
+        this.initializationPromise = null; // Track ongoing initialization
+        this.refreshPromise = null; // Track background refresh
     }
 
     /**
-     * Initialize game data (fetch/load tokens)
+     * Quick initialization - load from cache immediately
+     * This is fast and can be called before every game
      */
     async initialize() {
+        // If already initialized, return immediately
         if (this.isInitialized) return;
+
+        // If initialization is in progress, wait for it to complete
+        if (this.initializationPromise) {
+            return this.initializationPromise;
+        }
 
         console.log("🎮 Initializing Name That Artist game...");
 
-        try {
-            // Check if we need to refresh tokens
-            const needsRefresh = await needsTokenRefresh();
+        // Create initialization promise to prevent concurrent initializations
+        this.initializationPromise = (async () => {
+            try {
+                // Always try to load from cache first (fast)
+                console.log("📂 Loading tokens from cache...");
+                const data = await loadTokens();
 
-            if (needsRefresh) {
-                console.log("📥 Fetching fresh token data from objkt.com...");
+                if (data && data.tokens && data.tokens.length > 0) {
+                    this.tokens = data.tokens;
+                    this.artistInfo = data.artistInfo || {};
+
+                    // Filter artists based on config
+                    const allArtists = getUniqueArtists(this.tokens);
+                    if (config.game.excludeUnresolvedArtists) {
+                        this.artists = allArtists.filter((address) => this.artistInfo[address]?.hasResolution);
+                        this.tokens = this.tokens.filter(
+                            (token) => this.artistInfo[token.primaryArtist]?.hasResolution
+                        );
+                        console.log(`   Filtered to ${this.artists.length} artists with alias/domain`);
+                        console.log(`   Filtered to ${this.tokens.length} tokens with resolved artists`);
+                    } else {
+                        this.artists = allArtists;
+                    }
+
+                    console.log(
+                        `✅ Game initialized with ${this.tokens.length} tokens and ${this.artists.length} unique artists`
+                    );
+                    this.isInitialized = true;
+                } else {
+                    // No cache available - need to fetch (this should be rare)
+                    console.log("⚠️ No cache found, fetching fresh data...");
+                    await this.refreshData();
+                    this.isInitialized = true;
+                }
+            } catch (error) {
+                console.error("❌ Failed to initialize game:", error);
+                this.initializationPromise = null;
+                throw error;
+            } finally {
+                this.initializationPromise = null;
+            }
+        })();
+
+        return this.initializationPromise;
+    }
+
+    /**
+     * Refresh token data from API (slow operation, runs in background)
+     * This fetches new tokens and resolves artist names
+     */
+    async refreshData() {
+        // Prevent concurrent refreshes
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+
+        console.log("� Refreshing token data from objkt.com...");
+
+        this.refreshPromise = (async () => {
+            try {
                 const rawTokens = await fetchAllTokens();
                 this.tokens = rawTokens.map(normalizeToken).filter((t) => t.imageUrl);
 
@@ -50,47 +113,47 @@ export class NameThatArtistGame {
                 console.log("🔍 Resolving artist information...");
                 this.artistInfo = await batchResolveArtistNames(allArtists);
 
+                // Filter artists based on config
+                if (config.game.excludeUnresolvedArtists) {
+                    this.artists = allArtists.filter((address) => this.artistInfo[address]?.hasResolution);
+                    this.tokens = this.tokens.filter((token) => this.artistInfo[token.primaryArtist]?.hasResolution);
+                    console.log(`   Filtered to ${this.artists.length} artists with alias/domain`);
+                    console.log(`   Filtered to ${this.tokens.length} tokens with resolved artists`);
+                } else {
+                    this.artists = allArtists;
+                }
+
                 // Save to cache with artist info
                 const { saveTokens } = await import("./services/storage.js");
                 await saveTokens(this.tokens, this.artistInfo);
-            } else {
-                console.log("📂 Loading tokens from cache...");
-                const data = await loadTokens();
-                this.tokens = data.tokens;
-                this.artistInfo = data.artistInfo || {};
 
-                // If no artist info in cache, resolve it now
-                if (Object.keys(this.artistInfo).length === 0) {
-                    const allArtists = getUniqueArtists(this.tokens);
-                    console.log("🔍 Resolving artist information (not in cache)...");
-                    this.artistInfo = await batchResolveArtistNames(allArtists);
-
-                    // Update cache with artist info
-                    const { saveTokens } = await import("./services/storage.js");
-                    await saveTokens(this.tokens, this.artistInfo);
-                }
+                console.log(
+                    `✅ Data refreshed: ${this.tokens.length} tokens and ${this.artists.length} unique artists`
+                );
+            } catch (error) {
+                console.error("❌ Failed to refresh data:", error);
+                throw error;
+            } finally {
+                this.refreshPromise = null;
             }
+        })();
 
-            // Filter artists based on config
-            const allArtists = getUniqueArtists(this.tokens);
-            if (config.game.excludeUnresolvedArtists) {
-                this.artists = allArtists.filter((address) => this.artistInfo[address]?.hasResolution);
-                console.log(`   Filtered to ${this.artists.length} artists with alias/domain`);
+        return this.refreshPromise;
+    }
 
-                // Filter tokens to only include those with resolved artists
-                this.tokens = this.tokens.filter((token) => this.artistInfo[token.primaryArtist]?.hasResolution);
-                console.log(`   Filtered to ${this.tokens.length} tokens with resolved artists`);
-            } else {
-                this.artists = allArtists;
-            }
+    /**
+     * Check if data needs refresh and start background refresh if needed
+     * This is non-blocking and won't delay game start
+     */
+    async checkAndRefreshIfNeeded() {
+        const needsRefresh = await needsTokenRefresh();
 
-            console.log(
-                `✅ Game initialized with ${this.tokens.length} tokens and ${this.artists.length} unique artists`
-            );
-            this.isInitialized = true;
-        } catch (error) {
-            console.error("❌ Failed to initialize game:", error);
-            throw error;
+        if (needsRefresh && !this.refreshPromise) {
+            console.log("⏰ Data is stale (>24h), starting background refresh...");
+            // Fire and forget - don't await
+            this.refreshData().catch((error) => {
+                console.error("Background refresh failed:", error);
+            });
         }
     }
 
