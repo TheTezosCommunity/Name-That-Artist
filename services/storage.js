@@ -4,19 +4,19 @@
  * Now with progressive append-only log support for durability
  */
 
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { appendLogEntry, rebuildStateFromLog, compactLog, OpType } from './append-log.js';
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import { appendLogEntry, rebuildStateFromLog, compactLog, OpType } from "./append-log.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = path.join(__dirname, "..", "data");
 
 // File paths
-const TOKENS_FILE = path.join(DATA_DIR, 'tokens.json');
-const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
-const GAME_STATE_FILE = path.join(DATA_DIR, 'game_state.json');
+const TOKENS_FILE = path.join(DATA_DIR, "tokens.json");
+const PLAYERS_FILE = path.join(DATA_DIR, "players.json");
+const GAME_STATE_FILE = path.join(DATA_DIR, "game_state.json");
 
 /**
  * Ensure data directory exists
@@ -37,10 +37,10 @@ async function ensureDataDir() {
  */
 async function readJSON(filePath, defaultValue = null) {
     try {
-        const data = await fs.readFile(filePath, 'utf8');
+        const data = await fs.readFile(filePath, "utf8");
         return JSON.parse(data);
     } catch (error) {
-        if (error.code === 'ENOENT') {
+        if (error.code === "ENOENT") {
             return defaultValue;
         }
         throw error;
@@ -54,7 +54,7 @@ async function readJSON(filePath, defaultValue = null) {
  */
 async function writeJSON(filePath, data) {
     await ensureDataDir();
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
 }
 
 // ===== TOKENS =====
@@ -68,19 +68,19 @@ export async function saveTokens(tokens, artistInfo = null) {
     const data = {
         lastUpdated: new Date().toISOString(),
         count: tokens.length,
-        tokens: tokens
+        tokens: tokens,
     };
-    
+
     if (artistInfo) {
         data.artistInfo = artistInfo;
     }
-    
+
     // Write to both append log (for durability) and main file (for compatibility)
-    await appendLogEntry('tokens', {
+    await appendLogEntry("tokens", {
         op: OpType.SET,
-        data: data
+        data: data,
     });
-    
+
     await writeJSON(TOKENS_FILE, data);
 }
 
@@ -91,19 +91,19 @@ export async function saveTokens(tokens, artistInfo = null) {
 export async function loadTokens() {
     // Try loading from main file first
     const data = await readJSON(TOKENS_FILE, null);
-    
+
     // If main file doesn't exist, try rebuilding from append log
     if (data === null) {
         try {
-            const logState = await rebuildStateFromLog('tokens');
+            const logState = await rebuildStateFromLog("tokens");
             if (Object.keys(logState).length > 0) {
                 return logState;
             }
         } catch (error) {
-            console.error('Failed to rebuild from log:', error);
+            console.error("Failed to rebuild from log:", error);
         }
     }
-    
+
     return data;
 }
 
@@ -114,10 +114,10 @@ export async function loadTokens() {
 export async function needsTokenRefresh() {
     const data = await loadTokens();
     if (!data || !data.lastUpdated) return true;
-    
+
     const lastUpdate = new Date(data.lastUpdated);
     const hoursSinceUpdate = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60);
-    
+
     return hoursSinceUpdate > 24;
 }
 
@@ -130,20 +130,20 @@ export async function needsTokenRefresh() {
 export async function loadPlayers() {
     // Try loading from main file first
     const data = await readJSON(PLAYERS_FILE, null);
-    
+
     // If main file doesn't exist, try rebuilding from append log
     if (!data) {
         try {
-            const logState = await rebuildStateFromLog('players');
+            const logState = await rebuildStateFromLog("players");
             if (Object.keys(logState).length > 0) {
                 return logState;
             }
         } catch (error) {
-            console.error('Failed to rebuild from log:', error);
+            console.error("Failed to rebuild from log:", error);
         }
         return {};
     }
-    
+
     return data;
 }
 
@@ -153,10 +153,7 @@ export async function loadPlayers() {
  */
 export async function savePlayers(players) {
     // Removed redundant append log entry for full players object
-    
-    
-    
-    
+
     await writeJSON(PLAYERS_FILE, players);
 }
 
@@ -168,7 +165,7 @@ export async function savePlayers(players) {
 export async function getPlayerStats(userId) {
     const players = await loadPlayers();
     const existingPlayer = players[userId];
-    
+
     // Default structure
     const defaultStats = {
         userId,
@@ -182,17 +179,17 @@ export async function getPlayerStats(userId) {
         totalIncorrectAnswers: 0,
         totalAnswers: 0,
         accuracyRate: 0,
-        gamesHistory: []
+        gamesHistory: [],
     };
-    
+
     // Merge existing data with defaults (for backward compatibility)
     if (existingPlayer) {
         return {
             ...defaultStats,
-            ...existingPlayer
+            ...existingPlayer,
         };
     }
-    
+
     return defaultStats;
 }
 
@@ -205,10 +202,17 @@ export async function getPlayerStats(userId) {
  * @param {number} correctAnswers - Number of correct answers in this game
  * @param {number} incorrectAnswers - Number of incorrect answers in this game
  */
-export async function updatePlayerStats(userId, username, score, isWinner = false, correctAnswers = 0, incorrectAnswers = 0) {
+export async function updatePlayerStats(
+    userId,
+    username,
+    score,
+    isWinner = false,
+    correctAnswers = 0,
+    incorrectAnswers = 0
+) {
     const players = await loadPlayers();
     const existingStats = players[userId];
-    
+
     // Default structure
     const defaultStats = {
         userId,
@@ -222,54 +226,53 @@ export async function updatePlayerStats(userId, username, score, isWinner = fals
         totalIncorrectAnswers: 0,
         totalAnswers: 0,
         accuracyRate: 0,
-        gamesHistory: []
+        gamesHistory: [],
     };
-    
+
     // Merge with existing data for backward compatibility
     const stats = existingStats ? { ...defaultStats, ...existingStats } : defaultStats;
-    
+
     stats.username = username; // Update username if it changed
     stats.totalGames++;
     stats.totalScore += score;
     stats.averageScore = Math.round(stats.totalScore / stats.totalGames);
     stats.bestScore = Math.max(stats.bestScore, score);
-    
+
     // Update answer statistics
     stats.totalCorrectAnswers += correctAnswers;
     stats.totalIncorrectAnswers += incorrectAnswers;
     stats.totalAnswers = stats.totalCorrectAnswers + stats.totalIncorrectAnswers;
-    stats.accuracyRate = stats.totalAnswers > 0 
-        ? Math.round((stats.totalCorrectAnswers / stats.totalAnswers) * 100) 
-        : 0;
-    
+    stats.accuracyRate =
+        stats.totalAnswers > 0 ? Math.round((stats.totalCorrectAnswers / stats.totalAnswers) * 100) : 0;
+
     if (isWinner) {
         stats.totalWins++;
     }
-    
+
     stats.gamesHistory.push({
         date: new Date().toISOString(),
         score,
         isWinner,
         correctAnswers,
-        incorrectAnswers
+        incorrectAnswers,
     });
-    
+
     // Keep only last 50 games
     if (stats.gamesHistory.length > 50) {
         stats.gamesHistory = stats.gamesHistory.slice(-50);
     }
-    
+
     players[userId] = stats;
-    
+
     // Progressive write: append individual player update to log immediately
-    await appendLogEntry('players', {
+    await appendLogEntry("players", {
         op: OpType.SET,
         key: userId,
-        value: stats
+        value: stats,
     });
-    
+
     await savePlayers(players);
-    
+
     return stats;
 }
 
@@ -279,12 +282,12 @@ export async function updatePlayerStats(userId, username, score, isWinner = fals
  * @param {number} limit - Number of players to return
  * @returns {Promise<Array>} Sorted array of player stats
  */
-export async function getLeaderboard(sortBy = 'totalScore', limit = 10) {
+export async function getLeaderboard(sortBy = "totalScore", limit = 10) {
     const players = await loadPlayers();
     const playerArray = Object.values(players);
-    
+
     playerArray.sort((a, b) => b[sortBy] - a[sortBy]);
-    
+
     return playerArray.slice(0, limit);
 }
 
@@ -299,17 +302,17 @@ export async function saveGameState(channelId, state) {
     const allStates = await readJSON(GAME_STATE_FILE, {});
     const updatedState = {
         ...state,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
     };
     allStates[channelId] = updatedState;
-    
+
     // Progressive write: append individual game state update immediately
-    await appendLogEntry('game_state', {
+    await appendLogEntry("game_state", {
         op: OpType.SET,
         key: channelId,
-        value: updatedState
+        value: updatedState,
     });
-    
+
     await writeJSON(GAME_STATE_FILE, allStates);
 }
 
@@ -330,13 +333,13 @@ export async function loadGameState(channelId) {
 export async function clearGameState(channelId) {
     const allStates = await readJSON(GAME_STATE_FILE, {});
     delete allStates[channelId];
-    
+
     // Tombstone record: mark as deleted in append log
-    await appendLogEntry('game_state', {
+    await appendLogEntry("game_state", {
         op: OpType.DELETE,
-        key: channelId
+        key: channelId,
     });
-    
+
     await writeJSON(GAME_STATE_FILE, allStates);
 }
 
@@ -347,20 +350,20 @@ export async function clearGameState(channelId) {
 export async function getAllGameStates() {
     // Try loading from main file first
     const data = await readJSON(GAME_STATE_FILE, null);
-    
+
     // If main file doesn't exist, try rebuilding from append log
     if (data === null) {
         try {
-            const logState = await rebuildStateFromLog('game_state');
+            const logState = await rebuildStateFromLog("game_state");
             if (Object.keys(logState).length > 0) {
                 return logState;
             }
         } catch (error) {
-            console.error('Failed to rebuild from log:', error);
+            console.error("Failed to rebuild from log:", error);
         }
         return {};
     }
-    
+
     return data;
 }
 
@@ -369,9 +372,9 @@ export async function getAllGameStates() {
  * Can be called periodically or when needed
  */
 export async function compactAllLogs() {
-    console.log('🗜️ Starting manual compaction of all logs...');
-    
-    const logs = ['players', 'tokens', 'game_state'];
+    console.log("🗜️ Starting manual compaction of all logs...");
+
+    const logs = ["players", "tokens", "game_state"];
     for (const logName of logs) {
         try {
             await compactLog(logName);
@@ -380,6 +383,6 @@ export async function compactAllLogs() {
             console.error(`❌ Error compacting ${logName}:`, error);
         }
     }
-    
-    console.log('✅ Manual compaction complete');
+
+    console.log("✅ Manual compaction complete");
 }

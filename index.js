@@ -599,8 +599,13 @@ async function endRound(channel, channelId, message) {
         .setDescription(
             `The correct answer was: **${correctChoice.label} ${gameManager.getArtistDisplayName(
                 correctChoice.artist
-            )}**\n\n[View on objkt.com](${objktUrl})`
+            )}**`
         )
+        .addFields({
+            name: "🔗 View NFT",
+            value: objktUrl,
+            inline: false,
+        })
         .setFooter({ text: "Get ready for the next round!" });
 
     await channel.send({ embeds: [resultEmbed] });
