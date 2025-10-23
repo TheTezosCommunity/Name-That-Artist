@@ -530,14 +530,13 @@ async function displayRound(channel, channelId) {
     if (!session) return;
 
     // Create embed with artwork
-    // Using thumbnail for better/faster loading across clients
-    // Discord proxy caches images which helps with loading reliability
+    // Using full image for main display, Discord proxy caches it
     const embed = new EmbedBuilder()
         .setColor(config.branding.color)
         .setTitle(`🎨 Round ${roundNumber}/${totalRounds}`)
         .setDescription(`**${round.token.name || "Untitled"}**\n\nWho created this artwork?`)
-        .setThumbnail(round.token.imageUrl)
-        .setURL("https://objkt.com") // Helps Discord understand the source
+        .setImage(round.token.fullImageUrl || round.token.imageUrl)
+        .setURL("https://objkt.com")
         .setFooter({ text: `⏱️ You have ${session.roundTimeSeconds} seconds to answer!` })
         .setTimestamp();
 
